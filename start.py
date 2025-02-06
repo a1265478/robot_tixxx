@@ -1,11 +1,12 @@
 from playwright.async_api import async_playwright, TimeoutError
+
 import asyncio
 import os
 import setting
 import random
 from typing import Optional
 import easyocr
-import requests
+import time
 
 class TicketBot:
     def __init__(self):
@@ -17,15 +18,18 @@ class TicketBot:
         
     async def init_browser(self):
         """Initialize browser with optimized settings"""
+        
         playwright = await async_playwright().start()
         self.browser = await playwright.chromium.launch(
             headless=False,
+            channel='chrome',
             args=['--disable-dev-shm-usage', '--no-sandbox','--disable-blink-features=AutomationControlled']
         )
         # self.ocrBrowser = await playwright.chromium.launch(headless=True)
         context = await self.browser.new_context(
             viewport = setting.VIEWPORT,
-            user_agent = setting.USER_AGENT
+            user_agent = setting.USER_AGENT,
+            java_script_enabled=True,
         )
        
         self.page = await context.new_page()
@@ -157,6 +161,7 @@ class TicketBot:
         """登入流程"""
         try:
             await self.page.goto(setting.LOGIN_URL, wait_until='domcontentloaded')
+            await self.page.evaluate("document.body.focus()")
             await self.page.locator("#bs-navbar").get_by_role("link", name="會員登入").click()
             await self.page.locator("#loginGoogle").click()
             await self.page.get_by_label("電子郵件地址或電話號碼").click()
@@ -188,6 +193,8 @@ class TicketBot:
             print("導航到購票頁面...")
             await self.page.goto(setting.SELL_URL, 
                                wait_until='domcontentloaded')
+            await self.page.evaluate("document.body.focus()")
+            
             
             # 倒數輸入框
             # if await self.wait_for_clickable("[placeholder='請輸入倒數秒數']"):
@@ -201,13 +208,17 @@ class TicketBot:
             # 立即訂購按鈕
             if await self.wait_for_clickable("button:text('立即訂購')"):
                 await self.page.locator('button:text("立即訂購")').click()
+            # await self.page.get_by_role("row", name="/03/29 (六) ~ 2025/03/30 (日) 大港人優先購專區 高雄駁二藝術特區 立即訂購 選購一空").get_by_role("button").click() 
    
             
             # 身分證輸入
-            if await self.wait_for_clickable("input[type='text']") and setting.NEED_INPUT:
-                await self.page.locator('input[type="text"]').fill(setting.MEMBER_NUMBER)
+            # 排除第一個 input，選擇第二個 input
+            inputs = await self.page.query_selector_all('input[type="text"]')
+            if len(inputs) > 1 and setting.NEED_INPUT:
+                await inputs[1].fill(setting.MEMBER_NUMBER)
                 self.page.on("dialog", lambda dialog: dialog.accept())
-                await self.page.get_by_role("button").click()
+                await self.page.get_by_role("button", name="送出").click()
+
              
             # 選擇區域
             success = await self.select_area()
@@ -217,32 +228,6 @@ class TicketBot:
         except Exception as e:
             print(f"初始導航和表單填寫錯誤: {str(e)}")
 
-    # async def google_lens_ocr(self,source) -> Optional[str]:
-    #     """優化的 Google Lens OCR 流程"""
-    #     try:
-    #         async with async_playwright() as p:
-    #             image_source = f'https://tixcraft.com{source}'
-    #             print(f"Google Lens 圖片來源: {image_source}")
-    #             await self.ocr.get_by_placeholder("貼上圖片連結").fill(image_source)
-    #             await self.ocr.get_by_role("button", name="搜尋", exact=True).click()
-            
-    #             # 等待圖片載入和點擊
-    #             await self.wait_for_clickable(setting.OCR_IMAGE_LOCATOR)
-    #             await self.ocr.locator(setting.OCR_IMAGE_LOCATOR).click()
-        
-    #             # 獲取辨識結果
-    #             await self.ocr.locator(setting.OCR_TEXT_LOCATOR).click()
-    #             await self.ocr.wait_for_timeout(100)
-    #             result = await self.ocr.wait_for_selector(setting.OCR_TEXT_LOCATOR)
-    #             if result:
-    #                 text = await result.inner_text()
-    #                 print("Google Lens OCR 解析結果:", text.strip())
-    #                 return text.strip()
-    #             return None
-                
-    #     except Exception as e:
-    #         print(f"Google Lens OCR 錯誤: {str(e)}")
-    #         return None
     async def check_and_handle_dialog(self, timeout: int = 1000) -> bool:
         """
         檢查是否有彈出對話框並處理
@@ -274,8 +259,6 @@ class TicketBot:
             if await self.wait_for_clickable("button:text('確認張數')"):
                 await self.page.locator('button:text("確認張數")').click()
             
-
-
             # if await self.check_and_handle_dialog():
             #     raise Exception("訂票失敗")
             print('送訂單')
@@ -344,43 +327,71 @@ class TicketBot:
             if await self.wait_for_clickable("select"):
                 await self.page.locator('select').select_option(setting.TICKET_NUMBER)
                 await self.page.get_by_label("我已詳細閱讀且同意").check()
+                
         except Exception as e:
             print(f"選擇票數錯誤: {str(e)}")
 
     async def run(self):
         """主要運行流程"""
+        start_time = time.time()
+
         try:
             await self.init_browser()            
             # await self.ocr.goto(setting.GOOGLE_LENS_URL)
-            # await self.login()
+            await self.login()
             await self.page.goto(setting.SELL_URL, 
                                wait_until='domcontentloaded')
+            await self.page.evaluate("document.body.focus()")  # 移除焦點
+            await self.page.mouse.click(10, 10)  # 點擊讓焦點回到頁面
+            await self.page.keyboard.press("Escape")
+            await self.page.get_by_role("button", name="全部拒絕").click()
+
             await self.ready_to_buy()
             await self.navigate_and_fill_initial()
             
-            retry_count = 0
-            max_retries = 10
+            # retry_count = 0
+            # max_retries = 10
             
-            while retry_count < max_retries:
-                try:
-                    # 重試計數
-                    print(f"第 {retry_count + 1} 次嘗試...")
-                    await self.choose_ticket_count()
-                    await self.captcha_screenshot()
-                    captcha_text = self.recognize_captcha()
-                    if captcha_text:
-                        await self.complete_booking(captcha_text)
-                        break
-                except Exception:
-                    retry_count += 1
-                    await asyncio.sleep(0.5)
-                
+            # while retry_count < max_retries:
+            #     try:
+            #         # 重試計數
+            #         print(f"第 {retry_count + 1} 次嘗試...")
+                    
+
+            #         # await self.captcha_screenshot()
+            #         # captcha_text = self.recognize_captcha()
+            #         # if captcha_text:
+            #         #     await self.complete_booking(captcha_text)
+            #         #     break
+            #     except Exception:
+            #         retry_count += 1
+            #         await asyncio.sleep(0.5)
+            await self.choose_ticket_count()
+            await self.page.wait_for_timeout(500)
+            await self.page.evaluate("document.body.focus()")
+            await self.page.mouse.click(10, 10)
+            await self.page.keyboard.press("Escape")
+            await self.page.get_by_placeholder("請輸入驗證碼").dblclick()
+            while True:
+                captcha_text = await self.page.locator("input[placeholder='請輸入驗證碼']").input_value()
+                if len(captcha_text) == 4 and captcha_text.isalnum():
+                    await self.page.locator("button:text('確認張數')").click()
+                    break
+                await asyncio.sleep(0.1)
+
+            
+            
         except Exception as e:
             print(f"執行過程發生錯誤: {str(e)}")
         finally:
             if self.browser:
+                end_time = time.time()
                 print("搶票自動化流程結束")
-                await self.page.pause()
+                print("搶票流程完成，瀏覽器保持開啟中，請手動關閉...")
+                print(f"總耗時: {end_time - start_time} 秒")
+                self.keep_running = asyncio.Event()  # 建立事件
+                await self.keep_running.wait()
+                
       
 async def main():
     bot = TicketBot()

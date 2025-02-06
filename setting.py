@@ -2,7 +2,7 @@ LOGIN_URL = 'https://tixcraft.com/'
 ACCOUNT = 'tixket000@gmail.com'
 PASSWORD = 'forgetP@ssw0rd'
 SELL_URL = 'https://tixcraft.com/activity/game/25_maroon5'
-# SELL_URL = 'https://tixcraft.com/activity/game/25_waveearth'
+# SELL_URL = 'https://tixcraft.com/activity/game/25_megaport'
 
 
 AREA_LOCATOR = 'div[class*="area-list"] li'
