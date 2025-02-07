@@ -17,21 +17,82 @@ class TicketBot:
         
     async def init_browser(self):
         """Initialize browser with optimized settings"""
+
+        browser_args = [ 
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-automation',
+            '--disable-infobars',
+            '--disable-blink-features',
+            '--disable-blink-features=AutomationControlled',
+            f'--window-size={random.randint(1050, 1200)},{random.randint(800, 900)}',
+            '--disable-gpu',
+        ]
         
         playwright = await async_playwright().start()
         self.browser = await playwright.chromium.launch(
             headless=False,
             channel='chrome',
-            args=['--disable-dev-shm-usage', '--no-sandbox','--disable-blink-features=AutomationControlled']
+            # args=['--disable-dev-shm-usage', '--no-sandbox','--disable-blink-features=AutomationControlled']
+            args=browser_args
         )
         # self.ocrBrowser = await playwright.chromium.launch(headless=True)
         context = await self.browser.new_context(
             viewport = setting.VIEWPORT,
             user_agent = setting.USER_AGENT,
             java_script_enabled=True,
+            locale='zh-TW',
+            timezone_id='Asia/Taipei',
+            geolocation={'latitude': 25.0330, 'longitude': 121.5654},
+            permissions=['geolocation'],
+            color_scheme='light',
+            has_touch=True,
         )
+
+        await context.add_init_script("""
+            
+            Object.defineProperty(navigator, 'webdriver', {get: () => false});
+            
+            
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => {
+                    return [{
+                        0: {type: "application/x-google-chrome-pdf"},
+                        description: "Portable Document Format",
+                        filename: "internal-pdf-viewer",
+                        name: "Chrome PDF Plugin"
+                    }];
+                }
+            });
+            
+            
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['zh-TW', 'zh', 'en-US', 'en']
+            });
+            
+            
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+            
+            
+            const originalGetContext = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function(type) {
+                const context = originalGetContext.apply(this, arguments);
+                if (type === '2d') {
+                    const originalFillText = context.fillText;
+                    context.fillText = function() {
+                        arguments[0] = arguments[0] + ' ';
+                        return originalFillText.apply(this, arguments);
+                    }
+                }
+                return context;
+            };
+        """)
        
         self.page = await context.new_page()
+        
         # await stealth_async(self.page)
         # self.ocr = await self.ocrBrowser.new_page()
 
@@ -51,39 +112,6 @@ class TicketBot:
             
         self.page.on("load", lambda: random_delay())
         self.page.on("click", lambda: random_mouse_movement())
-    async def handle_route(self, route):
-        """智能處理資源請求"""
-        request = route.request
-        resource_type = request.resource_type
-        url = request.url
-
-        # 允許驗證碼相關的請求
-        if 'captcha' in url.lower():
-            await route.continue_()
-            return
-
-        # 根據資源類型選擇性攔截
-        if resource_type in ['image', 'font', 'media']:
-            # 允許驗證碼圖片相關的請求
-            if '.png' in url and 'captcha' in url:
-                await route.continue_()
-            else:
-                await route.abort()
-        elif resource_type == 'stylesheet':
-            # 只允許必要的 CSS
-            if 'essential' in url or 'main' in url:
-                await route.continue_()
-            else:
-                await route.abort()
-        elif resource_type == 'script':
-            # 只允許必要的 JS
-            if 'essential' in url or 'main' in url or 'captcha' in url:
-                await route.continue_()
-            else:
-                await route.abort()
-        else:
-            # 允許其他必要請求
-            await route.continue_()
 
     async def select_area(self):
         """選擇區域"""
@@ -107,13 +135,18 @@ class TicketBot:
                     # 獲取區域文本
                     area_text = await area.text_content()
                     # 檢查是否可選（不含"已售完"或其他不可選狀態）
+                    # area_status = await area.get_attribute("class")
+                    remaining_tickets = await area.get_attribute("data-remaining-tickets")
+                    is_hot = "熱賣中" in area_text
                     is_sold_out = "已售完" in area_text or "已售" in area_text
-                    if not is_sold_out:
+                    if not is_sold_out and (is_hot or (remaining_tickets and int(remaining_tickets) > 2)):
                         available_areas.append((area_text, area))
+                    # if not is_sold_out:
+                    #     available_areas.append((area_text, area))
                 
                 if not available_areas:
                     print("所有區域都已售完，準備重新整理...")
-                    await self.page.pause()
+
                     await self.page.reload()
                     continue
                 
@@ -133,7 +166,7 @@ class TicketBot:
                                 continue
                 
                 # 如果沒有偏好區域，選擇有位置並沒被排除的區域
-                if not selected:
+                if not selected and not setting.ONLY_PREFERRED_AREAS:
                     for area_text, area in available_areas:
                         if not any(excluded in area_text for excluded in setting.EXCLUDED_AREAS):
                             try:
@@ -148,13 +181,10 @@ class TicketBot:
                 # 如果沒有找到理想的區域，重新整理
                 if not selected:
                     print("沒有找到理想的區域，準備重新整理...")
-                    await self.page.pause()
                     await self.page.reload()
                 
                 # 可選擇添加短暫延遲以防止過於頻繁的重新整理
                 await asyncio.sleep(0.5)
-                await self.page.pause()
-
                 
         except Exception as e:
             print(f"選擇區域時發生錯誤: {str(e)}")
@@ -173,19 +203,21 @@ class TicketBot:
         """登入流程"""
         try:
             await self.page.goto(setting.LOGIN_URL, wait_until='domcontentloaded')
-            await self.page.evaluate("document.body.focus()")
             await self.page.locator("#bs-navbar").get_by_role("link", name="會員登入").click()
             await self.page.locator("#loginGoogle").click()
-            await self.page.get_by_label("電子郵件地址或電話號碼").click()
             await self.page.get_by_label("電子郵件地址或電話號碼").fill(setting.ACCOUNT)
+            await self.page.wait_for_timeout(500)
             await self.page.get_by_label("電子郵件地址或電話號碼").press("Enter")
             await self.page.get_by_label("輸入您的密碼").fill(setting.PASSWORD)
             await self.page.get_by_label("輸入您的密碼").press("Enter")
-            await self.page.locator("#user-name").is_visible()
+            while True:
+                print("等待登入...")
+                if await self.wait_for_clickable(".user-name"):
+                    break
+
             await self.page.goto(setting.SELL_URL, 
                                wait_until='domcontentloaded')
             print("登入成功")
-            
 
         except Exception as e:
             print(f"登入錯誤: {str(e)}")
@@ -193,13 +225,24 @@ class TicketBot:
     async def ready_to_buy(self):
         """準備購買流程"""
         try:
-            while not await self.wait_for_clickable("button:text('立即訂購')"):
+            while not await self.wait_for_clickable("button:text('立即訂購')",timeout=100):
+                print("尚未開賣...")
                 await self.page.wait_for_timeout(100)
                 await self.page.reload()            
+                print("Reload")
+
         except Exception as e:
             print(f"準備購買錯誤: {str(e)}")
+
+    async def click_buy_now(self):
+        """點擊立即購買按鈕"""
+        try:
+            if await self.wait_for_clickable("button:text('立即訂購')"):
+                await self.page.locator('button:text("立即訂購")').click()
+        except Exception as e:
+            print(f"點擊立即購買按鈕錯誤: {str(e)}")
    
-    async def navigate_and_fill_initial(self):
+    async def navigate_to_sell_page(self):
         """執行初始導航和表單填寫，使用最小等待時間"""
         try:
             print("導航到購票頁面...")
@@ -218,24 +261,24 @@ class TicketBot:
             #     await self.page.locator('button:text("立即購票")').click()
             
             # 立即訂購按鈕
-            if await self.wait_for_clickable("button:text('立即訂購')"):
-                await self.page.locator('button:text("立即訂購")').click()
-            # await self.page.get_by_role("row", name="/03/29 (六) ~ 2025/03/30 (日) 大港人優先購專區 高雄駁二藝術特區 立即訂購 選購一空").get_by_role("button").click() 
+            # if await self.wait_for_clickable("button:text('立即訂購')"):
+            #     await self.page.locator('button:text("立即訂購")').click()
    
             
             # 身分證輸入
             # 排除第一個 input，選擇第二個 input
-            inputs = await self.page.query_selector_all('input[type="text"]')
-            if len(inputs) > 1 and setting.NEED_INPUT:
-                await inputs[1].fill(setting.MEMBER_NUMBER)
-                self.page.on("dialog", lambda dialog: dialog.accept())
-                await self.page.get_by_role("button", name="送出").click()
+            # inputs = await self.page.query_selector_all('input[type="text"]')
+            # if len(inputs) > 1 and setting.NEED_INPUT:
+            #     await inputs[1].fill(setting.MEMBER_NUMBER)
+            #     self.page.on("dialog", lambda dialog: dialog.accept())
+            #     await self.page.get_by_role("button", name="送出").click()
+            # await self.enter_member_number()
 
              
             # 選擇區域
-            success = await self.select_area()
-            if not success:
-                raise Exception("無法選擇合適的區域")
+            # success = await self.select_area()
+            # if not success:
+                # raise Exception("無法選擇合適的區域")
 
         except Exception as e:
             print(f"初始導航和表單填寫錯誤: {str(e)}")
@@ -271,67 +314,11 @@ class TicketBot:
             if await self.wait_for_clickable("button:text('確認張數')"):
                 await self.page.locator('button:text("確認張數")').click()
             
-            # if await self.check_and_handle_dialog():
-            #     raise Exception("訂票失敗")
             print('送訂單')
             await self.page.pause()
 
         except Exception as e:
             print(f"完成訂票錯誤: {str(e)}")
-
-    def recognize_captcha(self)-> Optional[str]:
-        """識別驗證碼"""
-        reader = easyocr.Reader(['en']) 
-        result = reader.readtext(setting.IMAGE_PATH,allowlist='abcdefghijklmnopqrstuvwxyz')
-
-        # 解析結果
-        captcha_text = "".join([res[1] for res in result])  # 取出 OCR 識別的文字
-        print("EasyOCR 辨識結果:", captcha_text)
-        if not captcha_text.isalpha() or len(captcha_text) != 4:
-            return None
-        
-        return captcha_text.strip()
-
-
-    async def captcha_screenshot(self):
-        """處理驗證碼識別，確保圖片完全加載"""
-        try:
-            # 等待驗證碼圖片出現
-            await self.page.wait_for_selector("#TicketForm_verifyCode-image", state="visible", timeout=5000)
-
-            # 等待 naturalWidth > 0
-            await self.page.wait_for_function(
-                "() => document.querySelector('#TicketForm_verifyCode-image')?.naturalWidth > 0"
-            )
-
-            # 等待 complete 屬性
-            await self.page.wait_for_function(
-                "() => document.querySelector('#TicketForm_verifyCode-image')?.complete === true"
-            )
-
-            # **強制重繪**
-            # await self.page.evaluate("document.querySelector('#TicketForm_verifyCode-image').getBoundingClientRect()")
-
-            # 截圖
-            await self.page.evaluate("document.querySelector('#TicketForm_verifyCode-image').style.opacity = '1'")
-            await self.page.evaluate("document.querySelector('#TicketForm_verifyCode-image').style.display = 'block'")
-            await self.page.evaluate("""
-                let img = document.querySelector('#TicketForm_verifyCode-image');
-                img.style.zIndex = '9999';
-            """)
-            # 確保圖片元素完全可見
-            await self.page.wait_for_timeout(300)
-            # img_src = await self.page.evaluate("document.querySelector('#TicketForm_verifyCode-image').src")
-            # print("驗證碼圖片網址：", img_src)
-            # await page.screenshot(path="captcha.png")
-            # response = requests.get(img_src)
-            # with open(setting.IMAGE_PATH, "wb") as f:
-            #     f.write(response.content)
-            image_element = self.page.locator('#TicketForm_verifyCode-image')
-            await image_element.screenshot(path=setting.IMAGE_PATH)
-        except Exception as e:
-            print(f"驗證碼處理錯誤: {str(e)}")
-            return None
         
     async def choose_ticket_count(self):
         # 選擇票數
@@ -343,23 +330,86 @@ class TicketBot:
         except Exception as e:
             print(f"選擇票數錯誤: {str(e)}")
 
+    async def enter_member_number(self):
+        """輸入會員號碼"""
+        try:
+            inputs = await self.page.query_selector_all('input[type="text"]')
+            if len(inputs) > 1 and setting.NEED_INPUT:
+                await inputs[1].fill(setting.MEMBER_NUMBER)
+                self.page.on("dialog", lambda dialog: dialog.accept())
+                await self.page.get_by_role("button", name="送出").click()
+        except Exception as e:
+            print(f"輸入會員號碼錯誤: {str(e)}")
+
+    async def commit_to_buy(self):
+        """確認購買"""
+        try:
+            await self.choose_ticket_count()
+            await self.page.get_by_placeholder("請輸入驗證碼").click()
+            while True:
+                captcha_text = await self.page.locator("input[placeholder='請輸入驗證碼']").input_value()
+                if len(captcha_text) == 4 and captcha_text.isalnum():
+                    await self.page.locator("button:text('確認張數')").click()
+                    break
+                await asyncio.sleep(0.1)
+        except Exception as e:
+            print(f"確認購買錯誤: {str(e)}")
+
+    async def check_is_success(self):   
+        try:
+            await self.page.wait_for_selector("div:has-text('訂單明細')", timeout=1000)
+            return True
+        except Exception as e:
+            print(f"確認購買錯誤: {str(e)}")
+            return False
+        
+    async def setup_page(self):
+        """設置瀏覽器頁面"""
+        await self.page.evaluate("document.body.focus()")  # 移除焦點
+        await self.page.mouse.click(10, 10)  # 點擊讓焦點回到頁面
+        await self.page.keyboard.press("Escape")
+        try:
+            await self.page.get_by_role("button", name="全部拒絕").click()
+        except:
+            pass
+
     async def run(self):
         """主要運行流程"""
         start_time = time.time()
 
         try:
             await self.init_browser()            
-            # await self.ocr.goto(setting.GOOGLE_LENS_URL)
             await self.login()
             await self.page.goto(setting.SELL_URL, 
                                wait_until='domcontentloaded')
-            await self.page.evaluate("document.body.focus()")  # 移除焦點
-            await self.page.mouse.click(10, 10)  # 點擊讓焦點回到頁面
-            await self.page.keyboard.press("Escape")
-            await self.page.get_by_role("button", name="全部拒絕").click()
-
+            await self.setup_page()
             await self.ready_to_buy()
-            await self.navigate_and_fill_initial()
+            await self.navigate_to_sell_page()
+
+            while True: 
+                try:
+                    if self.page.url == setting.SELL_URL:
+                        await self.click_buy_now()
+                    if 'verify' in self.page.url:
+                        await self.enter_member_number()
+                    if 'area' in self.page.url:
+                        await self.select_area()
+                    if 'ticket/ticket' in self.page.url:
+                        await self.commit_to_buy()
+                    if 'order' in self.page.url:
+                        await self.page.wait_for_timeout(1000)
+                    if 'checkout' in self.page.url:
+                        break
+                    
+                except Exception as e:
+                    continue
+
+                await asyncio.sleep(0.1)
+            # 選擇區域
+            # success = await self.select_area()
+            # if not success:
+            #     raise Exception("無法選擇合適的區域")
+            # break
             
             # retry_count = 0
             # max_retries = 10
@@ -378,18 +428,18 @@ class TicketBot:
             #     except Exception:
             #         retry_count += 1
             #         await asyncio.sleep(0.5)
-            await self.choose_ticket_count()
-            await self.page.wait_for_timeout(500)
-            await self.page.evaluate("document.body.focus()")
-            await self.page.mouse.click(10, 10)
-            await self.page.keyboard.press("Escape")
-            await self.page.get_by_placeholder("請輸入驗證碼").dblclick()
-            while True:
-                captcha_text = await self.page.locator("input[placeholder='請輸入驗證碼']").input_value()
-                if len(captcha_text) == 4 and captcha_text.isalnum():
-                    await self.page.locator("button:text('確認張數')").click()
-                    break
-                await asyncio.sleep(0.1)
+            # await self.choose_ticket_count()
+            # await self.page.wait_for_timeout(500)
+            # await self.page.evaluate("document.body.focus()")
+            # await self.page.mouse.click(10, 10)
+            # await self.page.keyboard.press("Escape")
+            # await self.page.get_by_placeholder("請輸入驗證碼").dblclick()
+            # while True:
+            #     captcha_text = await self.page.locator("input[placeholder='請輸入驗證碼']").input_value()
+            #     if len(captcha_text) == 4 and captcha_text.isalnum():
+            #         await self.page.locator("button:text('確認張數')").click()
+            #         break
+            #     await asyncio.sleep(0.1)
 
             
             
