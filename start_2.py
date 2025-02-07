@@ -1,42 +1,68 @@
 from playwright.async_api import async_playwright, TimeoutError
-
 import asyncio
 import os
 import setting
 import random
 from typing import Optional
 import time
+import logging
 from random import uniform
 
 class TicketBot:
     def __init__(self):
         self.browser = None
         self.page = None
-        # self.ocr_browser = None
-        # self.ocr = None
+        self.area_locator = setting.AREA_LOCATOR_TEST
+        self.setup_logging()
+        
+    def setup_logging(self):
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('ticket_bot.log'),
+                logging.StreamHandler()
+            ]
+        )
         
     async def init_browser(self):
-        """Initialize browser with optimized settings"""
-        
+        """Initialize browser with enhanced anti-detection measures"""
         playwright = await async_playwright().start()
+        
+        # Enhanced browser arguments for anti-detection
         self.browser = await playwright.chromium.launch(
             headless=False,
             channel='chrome',
             args=['--disable-dev-shm-usage', '--no-sandbox','--disable-blink-features=AutomationControlled']
         )
-        # self.ocrBrowser = await playwright.chromium.launch(headless=True)
+        
         context = await self.browser.new_context(
             viewport = setting.VIEWPORT,
             user_agent = setting.USER_AGENT,
             java_script_enabled=True,
         )
-       
-        self.page = await context.new_page()
-        # await stealth_async(self.page)
-        # self.ocr = await self.ocrBrowser.new_page()
 
-        # 修改資源攔截策略，允許驗證碼圖片加載
-        # await self.page.route("**/*", lambda route: self.handle_route(route))
+        # Enhanced context settings
+        context = await self.browser.new_context(
+            viewport=setting.VIEWPORT,
+            user_agent=setting.USER_AGENT,
+            java_script_enabled=True,
+            locale='zh-TW',
+            timezone_id='Asia/Taipei',
+            geolocation={'latitude': 25.0330, 'longitude': 121.5654},
+            permissions=['geolocation'],
+            color_scheme='light',
+            has_touch=True,
+        )
+        
+        # Add custom scripts to mask automation
+        # await context.add_init_script("""
+        #     Object.defineProperty(navigator, 'webdriver', {get: () => false});
+        #     Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+        #     Object.defineProperty(navigator, 'languages', {get: () => ['zh-TW', 'zh', 'en-US', 'en']});
+        # """)
+        
+        self.page = await context.new_page()
         await self.add_human_behavior()
 
     async def add_human_behavior(self):
@@ -51,39 +77,71 @@ class TicketBot:
             
         self.page.on("load", lambda: random_delay())
         self.page.on("click", lambda: random_mouse_movement())
-    async def handle_route(self, route):
-        """智能處理資源請求"""
-        request = route.request
-        resource_type = request.resource_type
-        url = request.url
 
-        # 允許驗證碼相關的請求
-        if 'captcha' in url.lower():
-            await route.continue_()
-            return
+    async def retry_on_failure(self, func, max_retries=3, delay=1):
+        """Retry mechanism for functions"""
+        for attempt in range(max_retries):
+            try:
+                return await func()
+            except Exception as e:
+                logging.error(f"Attempt {attempt + 1} failed: {str(e)}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(delay)
+                else:
+                    raise
 
-        # 根據資源類型選擇性攔截
-        if resource_type in ['image', 'font', 'media']:
-            # 允許驗證碼圖片相關的請求
-            if '.png' in url and 'captcha' in url:
-                await route.continue_()
-            else:
-                await route.abort()
-        elif resource_type == 'stylesheet':
-            # 只允許必要的 CSS
-            if 'essential' in url or 'main' in url:
-                await route.continue_()
-            else:
-                await route.abort()
-        elif resource_type == 'script':
-            # 只允許必要的 JS
-            if 'essential' in url or 'main' in url or 'captcha' in url:
-                await route.continue_()
-            else:
-                await route.abort()
-        else:
-            # 允許其他必要請求
-            await route.continue_()
+    async def select_area_with_retry(self):
+        """Enhanced area selection with retry logic for sold-out situations"""
+        while True:
+            try:
+                success = await self.select_area()
+                if success:
+                    # 檢查是否有售完提示
+                    dialog_text = await self.check_sold_out_dialog()
+                    if dialog_text and "已售完" in dialog_text:
+                        logging.info("區域已售完，重新選擇...")
+                        await self.handle_sold_out()
+                        continue
+                    return True
+                
+                await asyncio.sleep(uniform(0.5, 1.0))
+                
+            except Exception as e:
+                logging.error(f"選擇區域時發生錯誤: {str(e)}")
+                await self.handle_error()
+
+    async def check_sold_out_dialog(self):
+        """Check for sold-out dialog"""
+        try:
+            dialog = await self.page.query_selector("div[role='dialog']")
+            if dialog:
+                return await dialog.text_content()
+            return None
+        except Exception:
+            return None
+
+    async def handle_sold_out(self):
+        """Handle sold-out situation"""
+        try:
+            # 關閉提示對話框
+            await self.page.click("button:has-text('確定')")
+            
+            # 返回區域選擇
+            await self.page.goto(setting.SELL_URL, wait_until='domcontentloaded')
+            
+            # 隨機延遲
+            await asyncio.sleep(uniform(0.5, 1.5))
+            
+            # 重新開始購票流程
+            await self.navigate_and_fill_initial()
+            
+        except Exception as e:
+            logging.error(f"處理售完情況時發生錯誤: {str(e)}")
+
+    async def handle_error(self):
+        """General error handling"""
+        await asyncio.sleep(uniform(1, 2))
+        await self.page.reload()
 
     async def select_area(self):
         """選擇區域"""
@@ -159,21 +217,10 @@ class TicketBot:
         except Exception as e:
             print(f"選擇區域時發生錯誤: {str(e)}")
             return False
-
-    async def wait_for_clickable(self, selector: str, timeout: int = 3000) -> bool:
-        """等待元素可點擊，有超時機制"""
-        try:
-            element = self.page.locator(selector)
-            await element.wait_for(state='visible', timeout=timeout)
-            return True
-        except TimeoutError:
-            return False
-        
     async def login(self):
         """登入流程"""
         try:
             await self.page.goto(setting.LOGIN_URL, wait_until='domcontentloaded')
-            await self.page.evaluate("document.body.focus()")
             await self.page.locator("#bs-navbar").get_by_role("link", name="會員登入").click()
             await self.page.locator("#loginGoogle").click()
             await self.page.get_by_label("電子郵件地址或電話號碼").click()
@@ -261,6 +308,15 @@ class TicketBot:
             print(f"處理對話框時發生錯誤: {str(e)}")
             return False
         
+    async def wait_for_clickable(self, selector: str, timeout: int = 3000) -> bool:
+        """等待元素可點擊，有超時機制"""
+        try:
+            element = self.page.locator(selector)
+            await element.wait_for(state='visible', timeout=timeout)
+            return True
+        except TimeoutError:
+            return False
+        
     async def complete_booking(self, captcha_text: str):
         """完成訂票流程"""
         try:
@@ -279,62 +335,48 @@ class TicketBot:
         except Exception as e:
             print(f"完成訂票錯誤: {str(e)}")
 
-    def recognize_captcha(self)-> Optional[str]:
-        """識別驗證碼"""
-        reader = easyocr.Reader(['en']) 
-        result = reader.readtext(setting.IMAGE_PATH,allowlist='abcdefghijklmnopqrstuvwxyz')
-
-        # 解析結果
-        captcha_text = "".join([res[1] for res in result])  # 取出 OCR 識別的文字
-        print("EasyOCR 辨識結果:", captcha_text)
-        if not captcha_text.isalpha() or len(captcha_text) != 4:
-            return None
+    async def run(self):
+        """Enhanced main running process with retry logic"""
+        start_time = time.time()
         
-        return captcha_text.strip()
-
-
-    async def captcha_screenshot(self):
-        """處理驗證碼識別，確保圖片完全加載"""
         try:
-            # 等待驗證碼圖片出現
-            await self.page.wait_for_selector("#TicketForm_verifyCode-image", state="visible", timeout=5000)
-
-            # 等待 naturalWidth > 0
-            await self.page.wait_for_function(
-                "() => document.querySelector('#TicketForm_verifyCode-image')?.naturalWidth > 0"
-            )
-
-            # 等待 complete 屬性
-            await self.page.wait_for_function(
-                "() => document.querySelector('#TicketForm_verifyCode-image')?.complete === true"
-            )
-
-            # **強制重繪**
-            # await self.page.evaluate("document.querySelector('#TicketForm_verifyCode-image').getBoundingClientRect()")
-
-            # 截圖
-            await self.page.evaluate("document.querySelector('#TicketForm_verifyCode-image').style.opacity = '1'")
-            await self.page.evaluate("document.querySelector('#TicketForm_verifyCode-image').style.display = 'block'")
-            await self.page.evaluate("""
-                let img = document.querySelector('#TicketForm_verifyCode-image');
-                img.style.zIndex = '9999';
-            """)
-            # 確保圖片元素完全可見
-            await self.page.wait_for_timeout(300)
-            # img_src = await self.page.evaluate("document.querySelector('#TicketForm_verifyCode-image').src")
-            # print("驗證碼圖片網址：", img_src)
-            # await page.screenshot(path="captcha.png")
-            # response = requests.get(img_src)
-            # with open(setting.IMAGE_PATH, "wb") as f:
-            #     f.write(response.content)
-            image_element = self.page.locator('#TicketForm_verifyCode-image')
-            await image_element.screenshot(path=setting.IMAGE_PATH)
+            await self.init_browser()
+            await self.retry_on_failure(self.login)
+            
+            while True:
+                try:
+                    await self.ready_to_buy()
+                    await self.navigate_and_fill_initial()
+                    await self.choose_ticket_count()
+                    
+                    # 等待驗證碼輸入
+                    await self.handle_captcha_input()
+                    
+                    # 檢查是否出現售完提示
+                    dialog_text = await self.check_sold_out_dialog()
+                    if dialog_text and "已售完" in dialog_text:
+                        logging.info("票券已售完，重試中...")
+                        await self.handle_sold_out()
+                        continue
+                    
+                    # 成功購票，跳出循環
+                    break
+                    
+                except Exception as e:
+                    logging.error(f"購票過程發生錯誤: {str(e)}")
+                    await self.handle_error()
+                    
         except Exception as e:
-            print(f"驗證碼處理錯誤: {str(e)}")
-            return None
-        
+            logging.error(f"執行過程發生錯誤: {str(e)}")
+        finally:
+            if self.browser:
+                end_time = time.time()
+                logging.info(f"總耗時: {end_time - start_time} 秒")
+                self.keep_running = asyncio.Event()
+                await self.keep_running.wait()
+
     async def choose_ticket_count(self):
-        # 選擇票數
+    # 選擇票數
         try:
             if await self.wait_for_clickable("select"):
                 await self.page.locator('select').select_option(setting.TICKET_NUMBER)
@@ -343,68 +385,23 @@ class TicketBot:
         except Exception as e:
             print(f"選擇票數錯誤: {str(e)}")
 
-    async def run(self):
-        """主要運行流程"""
-        start_time = time.time()
-
-        try:
-            await self.init_browser()            
-            # await self.ocr.goto(setting.GOOGLE_LENS_URL)
-            await self.login()
-            await self.page.goto(setting.SELL_URL, 
-                               wait_until='domcontentloaded')
-            await self.page.evaluate("document.body.focus()")  # 移除焦點
-            await self.page.mouse.click(10, 10)  # 點擊讓焦點回到頁面
-            await self.page.keyboard.press("Escape")
-            await self.page.get_by_role("button", name="全部拒絕").click()
-
-            await self.ready_to_buy()
-            await self.navigate_and_fill_initial()
-            
-            # retry_count = 0
-            # max_retries = 10
-            
-            # while retry_count < max_retries:
-            #     try:
-            #         # 重試計數
-            #         print(f"第 {retry_count + 1} 次嘗試...")
-                    
-
-            #         # await self.captcha_screenshot()
-            #         # captcha_text = self.recognize_captcha()
-            #         # if captcha_text:
-            #         #     await self.complete_booking(captcha_text)
-            #         #     break
-            #     except Exception:
-            #         retry_count += 1
-            #         await asyncio.sleep(0.5)
-            await self.choose_ticket_count()
-            await self.page.wait_for_timeout(500)
-            await self.page.evaluate("document.body.focus()")
-            await self.page.mouse.click(10, 10)
-            await self.page.keyboard.press("Escape")
-            await self.page.get_by_placeholder("請輸入驗證碼").dblclick()
-            while True:
+    async def handle_captcha_input(self):
+        """Enhanced captcha handling"""
+        while True:
+            try:
                 captcha_text = await self.page.locator("input[placeholder='請輸入驗證碼']").input_value()
                 if len(captcha_text) == 4 and captcha_text.isalnum():
+                    # 添加隨機延遲模擬人工輸入
+                    await asyncio.sleep(uniform(0.1, 0.3))
                     await self.page.locator("button:text('確認張數')").click()
                     break
                 await asyncio.sleep(0.1)
+            except Exception as e:
+                logging.error(f"驗證碼處理錯誤: {str(e)}")
+                raise
 
-            
-            
-        except Exception as e:
-            print(f"執行過程發生錯誤: {str(e)}")
-        finally:
-            if self.browser:
-                end_time = time.time()
-                print("搶票自動化流程結束")
-                print("搶票流程完成，瀏覽器保持開啟中，請手動關閉...")
-                print(f"總耗時: {end_time - start_time} 秒")
-                self.keep_running = asyncio.Event()  # 建立事件
-                await self.keep_running.wait()
-                
-      
+
+
 async def main():
     bot = TicketBot()
     await bot.run()
