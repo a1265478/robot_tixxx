@@ -1,13 +1,15 @@
+
+
 from playwright.async_api import async_playwright, TimeoutError
 
 import asyncio
 import os
-import kktix_setting
+import plus_setting as setting
 import random
 from typing import Optional
 import time
 from random import uniform
- 
+import re
 
 
 class TicketBot:
@@ -39,8 +41,8 @@ class TicketBot:
         )
         
         context = await self.browser.new_context(
-            viewport = kktix_setting.VIEWPORT,
-            user_agent = kktix_setting.USER_AGENT,
+            viewport = setting.VIEWPORT,
+            user_agent = setting.USER_AGENT,
             java_script_enabled=True,
             locale='zh-TW',
             timezone_id='Asia/Taipei',
@@ -107,73 +109,90 @@ class TicketBot:
         self.page.on("load", lambda: random_delay())
         self.page.on("click", lambda: random_mouse_movement())
 
-    
+    async def fetch_area(self) -> list :
+        """獲取區域"""
+        try:
+            while True:            
+                await self.page.wait_for_selector('div.seats-area')
+                areas = await self.page.query_selector_all(setting.AREA_LOCATOR)
+                print(f"總共 {len(areas)} 個區域")
+                if not areas:
+                    print("沒有找到任何區域，準備重新整理...")
+                    await self.wait_for_click('.v-btn__content','更新票數')
+                    continue
+                available_areas = []
+                for area in areas:                
+                    # 獲取區域文本
+                    area_text = await area.text_content()
+                    # 檢查是否可選（不含"已售完"或其他不可選狀態）
+                    if any(excluded in area_text for excluded in setting.EXCLUDED_AREAS):
+                        continue
+                    is_sold_out = "已售完" in area_text or "暫無票券" in area_text or "0\n" in area_text or "開賣時間" in area_text
+                    if not is_sold_out:
+                        available_areas.append((area_text, area))
+                   
+
+                if not available_areas:
+                    print("所有區域都已售完，準備重新整理...")
+                    await self.wait_for_click('.v-btn__content',text='更新票數')
+                    continue
+                print(available_areas)
+                return available_areas
+
+        except Exception as e:
+            print(f"獲取區域時發生錯誤: {str(e)}")
 
     async def select_area(self):
         """選擇區域"""
         try:
             while True:
-                
-                # 等待區域選項出現
-                # await self.page.wait_for_selector(kktix_setting.AREA_LOCATOR,timeout=100)
-                # 獲取所有區域元素
-                areas = await self.page.query_selector_all(kktix_setting.AREA_LOCATOR)
-                print(f"找到 {len(areas)} 個區域")
-                # 檢查是否有任何區域可選
-                if not areas:
-                    print("沒有找到任何區域，準備重新整理...")
-                    await self.page.reload()
-                    continue
-                
-                # 獲取所有區域的文本和狀態
-                available_areas = []
-                for area in areas:
-                    # 獲取區域文本
-                    area_text = await area.text_content()
-                    # 檢查是否可選（不含"已售完"或其他不可選狀態）
-                    if any(excluded in area_text for excluded in kktix_setting.EXCLUDED_AREAS):
-                        continue
-                    is_sold_out = "已售完" in area_text or "暫無票券" in area_text
-                    if not is_sold_out:
-                        available_areas.append((area_text, area))
-                
-                if not available_areas:
-                    print("所有區域都已售完，準備重新整理...")
-                    await self.page.reload()
-                    continue
-                
+                available_areas = await self.fetch_area()
+                print(f"找到 {len(available_areas)} 個可用區域")
                 # 按照優先順序尋找可用區域
                 selected = False
                 # 優先選擇偏好區域
-                for preferred in kktix_setting.PREFERRED_AREAS:
+                for preferred in setting.PREFERRED_AREAS:
                     for area_text, area in available_areas:
                         if preferred in area_text:
                             try:
                                 await self.page.mouse.move(50,100)
-                                element =  await area.query_selector('input[type="text"]')
-                                # await self.page.wait_for_timeout(200)
-                                await element.fill(f'{kktix_setting.TICKET_NUMBER}')
-                                # await area.click()
-                                # print(f"成功選擇偏好區域: {area_text}")
-                                selected = True
-                                return True
+                                await area.click()
+                                await self.page.wait_for_timeout(300)
+                                element = self.page.locator("role=button", has_text=re.compile(r"^$")).nth(2)
+                                if element:
+                                    try:
+                                        await element.click(click_count=setting.TICKET_NUMBER,timeout=300)
+                                        selected = True
+                                        return True
+                                    except Exception as e:
+                                        print(f"點擊偏好區域 {area_text} 時發生錯誤: {str(e)}")
+                                        continue
+                                else:
+                                    print("賣完了")
+                                    raise Exception("賣完了")
+                                
                             except Exception as e:
                                 print(f"點擊偏好區域 {area_text} 時發生錯誤: {str(e)}")
                                 continue
                 
                 # 如果沒有偏好區域，選擇有位置並沒被排除的區域
-                if not selected and not kktix_setting.ONLY_PREFERRED_AREAS:
+                if not selected and not setting.ONLY_PREFERRED_AREAS:
                     for area_text, area in available_areas:
-                        if not any(excluded in area_text for excluded in kktix_setting.EXCLUDED_AREAS):
+                        if not any(excluded in area_text for excluded in setting.EXCLUDED_AREAS):
                             try:
                                 # input
                                 await self.page.mouse.move(50,100)
-                                element =  await area.query_selector('input[type="text"]')
-                                await self.page.wait_for_timeout(200)
-                                await element.fill(f'{kktix_setting.TICKET_NUMBER}')
-                                print(f"成功選擇區域: {area_text}")
-                                selected = True
-                                return True
+                                await area.click()
+                                await self.page.wait_for_timeout(300)
+                                element = self.page.locator("role=button", has_text=re.compile(r"^$")).nth(2)
+                                if element:
+                                    await element.click(click_count=setting.TICKET_NUMBER)
+                                    selected = True
+                                    return True
+                                else:
+                                    print("賣完了")
+                                    raise Exception("賣完了")
+                                
                             except Exception as e:
                                 print(f"點擊區域 {area_text} 時發生錯誤: {str(e)}")
                                 continue
@@ -181,7 +200,7 @@ class TicketBot:
                 # 如果沒有找到理想的區域，重新整理
                 if not selected:
                     print("沒有找到理想的區域，準備重新整理...")
-                    await self.page.reload()
+                    await self.wait_for_click('.v-btn__content',text='更新票數')
                 
                 # 可選擇添加短暫延遲以防止過於頻繁的重新整理
                 await asyncio.sleep(0.5)
@@ -199,39 +218,47 @@ class TicketBot:
         except TimeoutError:
             return False
         
+    async def wait_for_click(self, selector: str ,text:str = None, timeout: int = 500) -> bool:
+        """等待元素可點擊，有超時機制"""
+        try:
+            element = self.page.locator(selector,has_text= text)
+            await element.wait_for(state='visible', timeout=timeout)
+            if element:
+                await element.click()
+            return True
+        except TimeoutError:
+            return False
+        
+    async def wait_for_role_clickable(self, role:str,text:str,auto_click :bool =True, timeout: int = 500) -> bool:
+        """等待元素可點擊，有超時機制"""
+        try:
+            element = await self.page.get_by_role(role, name=text).wait_for(state='visible',timeout=timeout)
+            if auto_click:
+                await element.click()
+            return True
+        except TimeoutError:
+            return False
+        
     async def login(self):
         """登入流程"""
         try:
-            if await self.wait_for_clickable("#nav-user-display-id"):
+            if await self.wait_for_role_clickable('button','登出'):
                     return
-            await self.page.goto(kktix_setting.LOGIN_URL, wait_until='domcontentloaded')
-            await self.page.get_by_role("link", name="登入").click()
-            await self.page.get_by_role("textbox", name="使用者名稱或 Email").click()
-            await self.page.get_by_role("textbox", name="使用者名稱或 Email").fill(kktix_setting.ACCOUNT)
-            await self.page.wait_for_timeout(500)
-            await self.page.get_by_role("textbox", name="密碼").fill(kktix_setting.PASSWORD)
-            await self.page.get_by_role("button", name="登入").click()
+            await self.page.goto(setting.LOGIN_URL, wait_until='domcontentloaded')
+            await self.page.get_by_role("button", name="會員登入").click()
+            await self.page.get_by_role("textbox", name="手機號碼 *").fill(setting.PHONE)
+            await self.page.wait_for_timeout(100)
+            await self.page.get_by_role("textbox", name="密碼").fill(setting.PASSWORD)
+            await self.page.get_by_role("button", name="登入", exact=True).click()
             while True:
                 print("等待登入...")
-                if await self.wait_for_clickable("#nav-user-display-id"):
+                if await self.wait_for_role_clickable('button','登出'):
                     break
 
             print("登入成功")
 
         except Exception as e:
             print(f"登入錯誤: {str(e)}")
-
-    async def ready_to_buy(self):
-        """準備購買流程"""
-        try:
-            while not await self.page.locator("button", has=self.page.locator("text='下一步'")).is_visible():
-                print("尚未開賣...")
-                await self.page.wait_for_timeout(1000)
-                await self.page.reload()            
-                print("Reload")
-
-        except Exception as e:
-            print(f"準備購買錯誤: {str(e)}")
 
     async def click_buy_now(self):
         """點擊立即購買按鈕"""
@@ -245,43 +272,17 @@ class TicketBot:
         """執行初始導航和表單填寫，使用最小等待時間"""
         try:
             print("導航到購票頁面...")
-            await self.page.goto(kktix_setting.SELL_URL, 
+            await self.page.goto(setting.SELL_URL, 
                                wait_until='domcontentloaded')
             await self.page.evaluate("document.body.focus()")
 
         except Exception as e:
             print(f"初始導航和表單填寫錯誤: {str(e)}")
-
-    async def check_and_handle_dialog(self, timeout: int = 1000) -> bool:
-        """
-        檢查是否有彈出對話框並處理
-        return: True 如果有對話框並處理了, False 如果沒有對話框
-        """
-        try:
-            # 等待對話框出現，但如果沒有也不報錯
-            dialog_button = self.page.locator("button:has-text('確定')")
-            is_visible = await dialog_button.is_visible()
-            
-            if is_visible:
-                # 找到對話框，點擊確認按鈕
-                await dialog_button.click()
-                print("發現對話框並處理完成")
-                return True
-            
-            return False
-        except Exception as e:
-            print(f"處理對話框時發生錯誤: {str(e)}")
-            return False
-        
         
     async def buy_process(self):
         try:
             print('BUY_PROCESS')
-            ready_to_fill = await self.wait_for_clickable(".contact-info")
-            if ready_to_fill:
-                return
             await self.select_area()
-            await self.page.get_by_role("checkbox", name="我已經閱讀並同意 服務條款 與 隱私權政策").check()
             await self.page.get_by_role("button", name="下一步").click()
         except Exception as e:
             return
@@ -293,30 +294,20 @@ class TicketBot:
             await self.init_browser()            
             await self.login()
             await self.navigate_to_sell_page()
-            await self.ready_to_buy()
             await self.buy_process()
-            await self.page.wait_for_timeout(100)
             while True:
                 try:
-                    print("等待購買...")
-                    is_sold_out = await self.wait_for_clickable('alert-wrapper alert-warning align-center')
-                    if is_sold_out:
-                        print("已售完")
-                        await self.page.reload()
-                        continue
-                    is_searching = await self.page.get_by_role("button", name="查詢空位中，請勿重新讀取或關閉此頁").is_visible()
+                    is_searching = await self.page.locator('.v-overlay__content').first.is_visible()
                     print(f'IS_SEARCHING:{is_searching}')
                     if is_searching:
                         continue
+                    await self.page.wait_for_timeout(500)
+                    if 'confirmSeat' in self.page.url:
+                        break
                     else:
-                        ready_to_fill = await self.wait_for_clickable(".contact-info")
-                        print(f'IS_READY_TO_FILL:{ready_to_fill}')
-                        if ready_to_fill:
-                            break
-                        else:
-                            await self.buy_process()
-                            # await self.page.wait_for_timeout(1000)
-                            continue
+                        await self.page.wait_for_timeout(uniform(100, 300))
+                        await self.buy_process()
+                    
                 except Exception as e:
                     print(f"執行過程發生錯誤: {str(e)}")
                     break
