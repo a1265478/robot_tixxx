@@ -126,6 +126,7 @@ class TicketBot:
                 # 檢查是否有任何區域可選
                 if not areas:
                     print("沒有找到任何區域，準備重新整理...")
+                    await self.page.wait_for_timeout(random.randint(500, 1000))
                     await self.page.reload()
                     continue
                 
@@ -143,7 +144,7 @@ class TicketBot:
                 
                 if not available_areas:
                     print("所有區域都已售完，準備重新整理...")
-
+                    await self.page.wait_for_timeout(random.randint(500, 1000))
                     await self.page.reload()
                     continue
                 
@@ -178,10 +179,11 @@ class TicketBot:
                 # 如果沒有找到理想的區域，重新整理
                 if not selected:
                     print("沒有找到理想的區域，準備重新整理...")
+                    await self.page.wait_for_timeout(random.randint(500, 1000))
                     await self.page.reload()
                 
                 # 可選擇添加短暫延遲以防止過於頻繁的重新整理
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(random.randint(0.5, 1))
                 
         except Exception as e:
             print(f"選擇區域時發生錯誤: {str(e)}")
@@ -222,11 +224,13 @@ class TicketBot:
     async def ready_to_buy(self):
         """準備購買流程"""
         try:
-            while not await self.wait_for_clickable("button:text('立即訂購')",timeout=100):
-                print("尚未開賣...")
-                await self.page.wait_for_timeout(100)
-                await self.page.reload()            
-                print("Reload")
+            element = await self.page.get_by_role('row', name='2025/05/25 (日) 18:00 j-hope').get_by_role('button')
+            
+            # while not await self.wait_for_clickable("button:text('立即訂購')",timeout=100):
+            #     print("尚未開賣...")
+            #     await self.page.wait_for_timeout(100)
+            #     await self.page.reload()            
+            #     print("Reload")
 
         except Exception as e:
             print(f"準備購買錯誤: {str(e)}")
@@ -234,8 +238,11 @@ class TicketBot:
     async def click_buy_now(self):
         """點擊立即購買按鈕"""
         try:
-            if await self.wait_for_clickable("button:text('立即訂購')"):
-                await self.page.locator('button:text("立即訂購")').click()
+            element = self.page.get_by_role('row', name='2025/05/25 (日) 18:00 j-hope').get_by_role('button')
+            await element.wait_for(state='visible', timeout=100)
+            await element.click()
+            # if await self.wait_for_clickable("button:text('立即訂購')"):
+            #     await self.page.locator('button:text("立即訂購")').click()
         except Exception as e:
             print(f"點擊立即購買按鈕錯誤: {str(e)}")
    
@@ -246,36 +253,6 @@ class TicketBot:
             await self.page.goto(setting.SELL_URL, 
                                wait_until='domcontentloaded')
             await self.page.evaluate("document.body.focus()")
-            
-            
-            # 倒數輸入框
-            # if await self.wait_for_clickable("[placeholder='請輸入倒數秒數']"):
-            #     await self.page.get_by_placeholder("請輸入倒數秒數").fill("1")
-            #     await self.page.get_by_role("button", name="開始倒數計時").click()
-            
-            # 立即購票按鈕
-            # if await self.wait_for_clickable("button:text('立即購票')"):
-            #     await self.page.locator('button:text("立即購票")').click()
-            
-            # 立即訂購按鈕
-            # if await self.wait_for_clickable("button:text('立即訂購')"):
-            #     await self.page.locator('button:text("立即訂購")').click()
-   
-            
-            # 身分證輸入
-            # 排除第一個 input，選擇第二個 input
-            # inputs = await self.page.query_selector_all('input[type="text"]')
-            # if len(inputs) > 1 and setting.NEED_INPUT:
-            #     await inputs[1].fill(setting.MEMBER_NUMBER)
-            #     self.page.on("dialog", lambda dialog: dialog.accept())
-            #     await self.page.get_by_role("button", name="送出").click()
-            # await self.enter_member_number()
-
-             
-            # 選擇區域
-            # success = await self.select_area()
-            # if not success:
-                # raise Exception("無法選擇合適的區域")
 
         except Exception as e:
             print(f"初始導航和表單填寫錯誤: {str(e)}")
@@ -300,22 +277,7 @@ class TicketBot:
         except Exception as e:
             print(f"處理對話框時發生錯誤: {str(e)}")
             return False
-        
-    async def complete_booking(self, captcha_text: str):
-        """完成訂票流程"""
-        try:
-            # 同時執行驗證碼填寫和勾選同意
-            print("填寫驗證碼並確認張數...")
-            await self.page.get_by_placeholder("請輸入驗證碼").fill(captcha_text)
 
-            if await self.wait_for_clickable("button:text('確認張數')"):
-                await self.page.locator('button:text("確認張數")').click()
-            
-            print('送訂單')
-            await self.page.pause()
-
-        except Exception as e:
-            print(f"完成訂票錯誤: {str(e)}")
 
     async def try_to_choose_max_ticket(self):
         """選擇票數若不夠就選擇最大數"""
@@ -358,6 +320,7 @@ class TicketBot:
         """確認購買"""
         try:
             await self.choose_ticket_count()
+            await self.page.locator('#TicketForm_agree').check()
             await self.page.get_by_placeholder("請輸入驗證碼").click()
             while True:
                 if await self.wait_for_clickable("input[placeholder='請輸入驗證碼']"):
@@ -393,7 +356,7 @@ class TicketBot:
         # 被踢出來要再回到搶票頁面
         try:
             await self.init_browser()            
-            # await self.login()
+            await self.login()
             await self.page.goto(setting.SELL_URL, 
                                wait_until='domcontentloaded')
             await self.setup_page()
@@ -402,7 +365,7 @@ class TicketBot:
 
             while True: 
                 try:
-                    if self.page.url == setting.SELL_URL:
+                    if 'game' in self.page.url:
                         await self.click_buy_now()
                     if 'verify' in self.page.url:
                         await self.enter_member_number()
@@ -411,7 +374,7 @@ class TicketBot:
                     if 'ticket/ticket' in self.page.url:
                         await self.commit_to_buy()
                     if 'order' in self.page.url:
-                        await self.page.wait_for_timeout(1000)
+                        await self.page.wait_for_timeout(random.randint(500, 1000))
                     if 'checkout' in self.page.url:
                         break
                     
@@ -428,6 +391,8 @@ class TicketBot:
                 print("搶票自動化流程結束")
                 print("搶票流程完成，瀏覽器保持開啟中，請手動關閉...")
                 print(f"總耗時: {end_time - start_time} 秒")
+                self.page.on("dialog", lambda dialog: print(f"發現對話框: {dialog.message}"))
+                await self.page.pause()
                 self.keep_running = asyncio.Event()  # 建立事件
                 await self.keep_running.wait()
                 
