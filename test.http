@@ -1,0 +1,29 @@
+POST https://ticketapi.ibon.com.tw/api/ActivityInfo/GetGameInfoList HTTP/2
+Host: ticketapi.ibon.com.tw
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:136.0) Gecko/20100101 Firefox/136.0
+Accept: application/json, text/plain, */*
+Accept-Language: zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3
+Accept-Encoding: gzip, deflate, br, zstd
+Referer: https://ticket.ibon.com.tw/
+Content-Type: application/json
+observe: response
+Content-Length: 52
+Origin: https://ticket.ibon.com.tw
+Connection: keep-alive
+Sec-Fetch-Dest: empty
+Sec-Fetch-Mode: cors
+Sec-Fetch-Site: same-site
+Cookie: lastUrl=%2FActivityInfo%2FDetails%2F38735; _ga_0WBR78PRVP=GS1.1.1741458906.1.1.1741458911.55.0.0; _ga=GA1.1.389044735.1741458906; .AspNetCore.Antiforgery.cdV5uW_Ejgc=CfDJ8ATQjvx_LrtIoAKQbYzApU0l0lUkt3YeFNC8rzNuqpCfQGYYSXnSkBRAyzZ9ydPblNPN8-_c6oeYRle7UkLAoOX4-IVs_gsGVvOowT8aiFid6Ae4RuDD-kUThbCTpYrpB7lE-6x-NLo7qI124tV_XDs; XSRF-TOKEN=CfDJ8ATQjvx_LrtIoAKQbYzApU2At5TGxPktDUqe59z0M2uHc5YaqyPE7GP4W1qbLUivh3NwvC8yQjRttHVo0_CE5mEZmzf9kShmtEoFZJ6O0rF5VCGtedf4IAE_ZTylF44jmfYz8uHHUpNQOwJ3HsZ9q_U
+X-XSRF-TOKEN: CfDJ8ATQjvx_LrtIoAKQbYzApU2At5TGxPktDUqe59z0M2uHc5YaqyPE7GP4W1qbLUivh3NwvC8yQjRttHVo0_CE5mEZmzf9kShmtEoFZJ6O0rF5VCGtedf4IAE_ZTylF44jmfYz8uHHUpNQOwJ3HsZ9q_U
+
+{
+    "id":38825,
+    "hasDeadline":true,
+    "SystemBrowseType":0
+}
+
+
+### Get areas listå
+GET https://qwareticket-asysimg.azureedge.net/QWARE_TICKET/images/Temp/B086TCFK/1_B086TCFK_live.map?v=a6f73dd3-ea6f-4032-ba7c-1701454379b3 HTTP/2
+
+https://orders.ibon.com.tw/application/UTK02/UTK0201_000.aspx?PERFORMANCE_ID=B086TCFK&PRODUCT_ID=B086T34I&strItem=WEB%E7%B6%B2%E7%AB%99%E5%85%A5%E5%8F%A31&Token=MTE0LjQ1LjE5Mi4xMjR8MTc0MTUyMzE3MjgwN3xEdlRpUWdTL3ROVVQ5cEJheWFHeWRKN2thUjhoRzAwVW10emZvRERxVXJVPQ==
