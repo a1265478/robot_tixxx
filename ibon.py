@@ -6,10 +6,17 @@ import re
 import ibon_setting as setting
 import script as S
 import random
+import pytesseract
+import cv2
 from typing import Optional
 import time
 from random import uniform
 from bs4 import BeautifulSoup
+import numpy as np
+import ddddocr
+from PIL import Image
+
+
 class TicketBot:
     def __init__(self):
         self.browser = None
@@ -55,7 +62,7 @@ class TicketBot:
         )
 
         await context.add_init_script(S.SCRIPT)
-        await context.add_cookies([setting.COOKIE])
+        # await context.add_cookies([setting.COOKIE])
         self.page = await context.new_page()
         await self.page.goto(setting.LOGIN_URL, wait_until='domcontentloaded')
         await self.page.pause()
@@ -103,9 +110,11 @@ class TicketBot:
                         if ticket_info['Remaining'] == '0':
                             continue
                         await self.page.evaluate(href)
-                  
-                        break
-                return True
+                        return True
+                
+                print("沒有找到合適的票區，重新整理頁面")
+                await self.page.reload()
+                await asyncio.sleep(0.5)
             else:
                 print(f"API 請求錯誤: {status_code}")
                 raise Exception(f"API 請求錯誤: {status_code}")
@@ -177,24 +186,6 @@ class TicketBot:
         print(f"PERFORMANCE_ID: {performance_id}")
         print(f"PRODUCT_ID: {product_id}")
 
-    async def click_buy_now(self):
-        """點擊立即購買按鈕"""
-        try:
-            if await self.wait_for_clickable("button:text('立即訂購')"):
-                await self.page.locator('button:text("立即訂購")').click()
-        except Exception as e:
-            print(f"點擊立即購買按鈕錯誤: {str(e)}")
-   
-    async def navigate_to_sell_page(self):
-        """執行初始導航和表單填寫，使用最小等待時間"""
-        try:
-            print("導航到購票頁面...")
-            await self.page.goto(setting.SELL_URL, 
-                               wait_until='domcontentloaded')
-            await self.page.evaluate("document.body.focus()")
-
-        except Exception as e:
-            print(f"初始導航和表單填寫錯誤: {str(e)}")
 
     async def check_and_handle_dialog(self, timeout: int = 1000) -> bool:
         """
@@ -217,17 +208,6 @@ class TicketBot:
             print(f"處理對話框時發生錯誤: {str(e)}")
             return False
         
-    async def complete_booking(self, captcha_text: str):
-        """完成訂票流程"""
-        try:
-            
-            await self.page.locator("#ctl00_ContentPlaceHolder1_CHK").fill('1234')
-            # ocr 用 network source
-            await self.page.pause()
-
-        except Exception as e:
-            print(f"完成訂票錯誤: {str(e)}")
-
     async def try_to_choose_max_ticket(self):
         """選擇票數若不夠就選擇最大數"""
         try:
@@ -245,14 +225,19 @@ class TicketBot:
     async def choose_ticket_count(self):
         """選擇票數"""
         try:
+            is_sold_out = await self.page.get_by_text("已售完", exact=True).is_visible(timeout=500)
+            if is_sold_out:
+                print("已售完")
+                await self.page.go_back()
+                await self.select_area()
+                return
             element = self.page.locator('#ctl00_ContentPlaceHolder1_DataGrid_ctl02_AMOUNT_DDL')
-            if element:
-                await element.select_option(setting.TICKET_NUMBER)
-            else:
-                raise Exception("找不到票數選擇框")
+            await element.is_visible(timeout=500)
+            await element.select_option(setting.TICKET_NUMBER)
                 
         except Exception as e:
             await self.page.go_back()
+            await self.select_area()
             print(f"選擇票數錯誤: {str(e)},返回上一頁重新選擇")
             raise Exception(f"選擇票數錯誤: {str(e)},返回上一頁重新選擇")
 
@@ -261,7 +246,7 @@ class TicketBot:
         """輸入會員號碼"""
         try:
             await self.page.locator('#ctl00_ContentPlaceHolder1_Txt_id_name').fill(setting.INPUT_VALUE)
-            await self.page.get_by_role('button',name='送出').click()
+            await self.page.get_by_role("link", name="送出").click()
         except Exception as e:
             print(f"輸入會員號碼錯誤: {str(e)}")
 
@@ -269,15 +254,7 @@ class TicketBot:
         """確認購買"""
         try:
             await self.choose_ticket_count()
-            await self.page.locator("#ctl00_ContentPlaceHolder1_CHK").click()
-            while True:
-                captcha_text = await self.page.locator("#ctl00_ContentPlaceHolder1_CHK").input_value()
-                if len(captcha_text) == 4 and captcha_text.isnumeric():
-                    await self.page.locator("#Next div").click()
-                    break
-                await asyncio.sleep(0.1)
-            await self.page.pause()
-               
+            await self.validate_captcha()
         except Exception as e:
             print(f"確認購買錯誤: {str(e)}")
 
@@ -289,8 +266,31 @@ class TicketBot:
             print(f"確認購買錯誤: {str(e)}")
             return False
     
- 
-
+    async def validate_captcha(self):
+        """驗證驗證碼"""
+        try:
+            element = self.page.get_by_text("驗證碼：(全為數字組成) 請勿多視窗操作，以免驗證碼未更新，購票失敗")
+            await element.is_visible(timeout=500)
+            box = await element.bounding_box()
+            await self.page.screenshot(
+                path=setting.IMAGE_PATH,
+                clip={
+                    "x": box["x"] + 180,
+                    "y": box["y"],
+                    "width": box["width"] - 350,
+                    "height": box["height"] - 25
+                }
+            )
+        
+            ocr = ddddocr.DdddOcr()
+            with open(setting.IMAGE_PATH, "rb") as f:
+                image = f.read()
+            result = ocr.classification(image)
+            print(result)
+            await self.page.locator("#ctl00_ContentPlaceHolder1_CHK").fill(result)
+            await self.page.locator("#Next div").click()
+        except Exception as e:
+            print(f"驗證驗證碼錯誤: {str(e)}")
 
     async def run(self):
         """主要運行流程"""
@@ -298,10 +298,9 @@ class TicketBot:
         # 被踢出來要再回到搶票頁面
         try:
             await self.init_browser()
-            await self.page.goto(setting.LOGIN_URL, wait_until='domcontentloaded')   
-            await self.page.pause()     
+           
             await self.ready_to_buy()
-            await self.page.pause()
+            
             while True:
                 try:
                     await self.page.wait_for_timeout(300)
@@ -337,6 +336,8 @@ class TicketBot:
                 print("搶票自動化流程結束")
                 print("搶票流程完成，瀏覽器保持開啟中，請手動關閉...")
                 print(f"總耗時: {end_time - start_time} 秒")
+                self.page.on("dialog", lambda dialog: print(f"發現對話框: {dialog.message}"))
+                await self.page.pause()
                 self.keep_running = asyncio.Event()  # 建立事件
                 await self.keep_running.wait()
                 

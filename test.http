@@ -17,13 +17,13 @@ Cookie: lastUrl=%2FActivityInfo%2FDetails%2F38735; _ga_0WBR78PRVP=GS1.1.17414589
 X-XSRF-TOKEN: CfDJ8ATQjvx_LrtIoAKQbYzApU2At5TGxPktDUqe59z0M2uHc5YaqyPE7GP4W1qbLUivh3NwvC8yQjRttHVo0_CE5mEZmzf9kShmtEoFZJ6O0rF5VCGtedf4IAE_ZTylF44jmfYz8uHHUpNQOwJ3HsZ9q_U
 
 {
-    "id":38825,
+    "id":38834,
     "hasDeadline":true,
     "SystemBrowseType":0
 }
 
 
-### Get areas listå
+### Get areas list
 GET https://qwareticket-asysimg.azureedge.net/QWARE_TICKET/images/Temp/B086TCFK/1_B086TCFK_live.map?v=a6f73dd3-ea6f-4032-ba7c-1701454379b3 HTTP/2
 
 https://orders.ibon.com.tw/application/UTK02/UTK0201_000.aspx?PERFORMANCE_ID=B086TCFK&PRODUCT_ID=B086T34I&strItem=WEB%E7%B6%B2%E7%AB%99%E5%85%A5%E5%8F%A31&Token=MTE0LjQ1LjE5Mi4xMjR8MTc0MTUyMzE3MjgwN3xEdlRpUWdTL3ROVVQ5cEJheWFHeWRKN2thUjhoRzAwVW10emZvRERxVXJVPQ==

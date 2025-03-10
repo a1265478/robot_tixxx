@@ -17,7 +17,7 @@ COOKIE = {
     'sameSite': 'Lax'
 }
 NEED_INPUT = True
-INPUT_VALUE = 'GS651471856'
+INPUT_VALUE = '515721'
 # Description: Robot setting
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 VIEWPORT = {'width': 1440, 'height': 1080}
