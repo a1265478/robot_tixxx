@@ -24,7 +24,7 @@ VIEWPORT = {'width': 1440, 'height': 1080}
 IMAGE_PATH = 'captcha.png'
 # Description: Hope
 TICKET_NUMBER = '2'
-EXCLUDED_AREAS = ['身障','搖滾','愛心']
+EXCLUDED_AREAS = ['身障','搖滾','愛心','SUPER']
 PREFERRED_AREAS = ['6880','B2層特']
 ONLY_PREFERRED_AREAS = False
 
@@ -48,6 +48,6 @@ HEADER = {
     'X-XSRF-TOKEN': 'CfDJ8ATQjvx_LrtIoAKQbYzApU2At5TGxPktDUqe59z0M2uHc5YaqyPE7GP4W1qbLUivh3NwvC8yQjRttHVo0_CE5mEZmzf9kShmtEoFZJ6O0rF5VCGtedf4IAE_ZTylF44jmfYz8uHHUpNQOwJ3HsZ9q_U'
 }
 
-GAME_ID = 38825
+GAME_ID = 38834
 GAMES_API = 'https://ticketapi.ibon.com.tw/api/ActivityInfo/GetGameInfoList'
 AREA_API = 'https://qwareticket-asysimg.azureedge.net/QWARE_TICKET/images/Temp/{performance_id}/1_{performance_id}_live.map'

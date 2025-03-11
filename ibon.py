@@ -63,6 +63,7 @@ class TicketBot:
 
         await context.add_init_script(S.SCRIPT)
         # await context.add_cookies([setting.COOKIE])
+        
         self.page = await context.new_page()
         await self.page.goto(setting.LOGIN_URL, wait_until='domcontentloaded')
         await self.page.pause()
@@ -103,7 +104,7 @@ class TicketBot:
                         ticket_info['TicketArea'] = area_match.group(1).strip()
                         ticket_info['Price'] = area_match.group(2)
                         ticket_info['Remaining'] = area_match.group(3)
-
+                        print(f"票區: {ticket_info['TicketArea']} 票價: {ticket_info['Price']} 尚餘: {ticket_info['Remaining']}")
                         # 如果是排除區域，則跳過
                         if any(excluded_area in ticket_info['TicketArea'] for excluded_area in setting.EXCLUDED_AREAS):
                             continue
@@ -299,8 +300,8 @@ class TicketBot:
         try:
             await self.init_browser()
            
-            await self.ready_to_buy()
-            
+            # await self.ready_to_buy()
+                        
             while True:
                 try:
                     await self.page.wait_for_timeout(300)
@@ -320,6 +321,7 @@ class TicketBot:
                     if is_submit:
                         await self.commit_to_buy()
                         continue
+                    
                     
 
                 except Exception as e:
