@@ -10,7 +10,7 @@ from typing import Optional
 import time
 from random import uniform
 import re
-
+import script as S
 
 class TicketBot:
     def __init__(self):
@@ -21,23 +21,13 @@ class TicketBot:
     async def init_browser(self):
         """Initialize browser with optimized settings"""
 
-        browser_args = [ 
-            '--disable-dev-shm-usage',
-            '--no-sandbox',
-            '--disable-blink-features=AutomationControlled',
-            '--disable-automation',
-            '--disable-infobars',
-            '--disable-blink-features',
-            '--disable-blink-features=AutomationControlled',
-            f'--window-size={random.randint(1050, 1200)},{random.randint(800, 900)}',
-            '--disable-gpu',
-        ]
+        
         
         playwright = await async_playwright().start()
         self.browser = await playwright.chromium.launch(
             headless=False,
             channel='chrome',
-            args=browser_args
+            args=S.BROWSER_ARGS,
         )
         
         context = await self.browser.new_context(
@@ -52,46 +42,7 @@ class TicketBot:
             has_touch=True,
         )
 
-        await context.add_init_script("""
-            
-            Object.defineProperty(navigator, 'webdriver', {get: () => false});
-            
-            
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => {
-                    return [{
-                        0: {type: "application/x-google-chrome-pdf"},
-                        description: "Portable Document Format",
-                        filename: "internal-pdf-viewer",
-                        name: "Chrome PDF Plugin"
-                    }];
-                }
-            });
-            
-            
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['zh-TW', 'zh', 'en-US', 'en']
-            });
-            
-            
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
-            
-            
-            const originalGetContext = HTMLCanvasElement.prototype.getContext;
-            HTMLCanvasElement.prototype.getContext = function(type) {
-                const context = originalGetContext.apply(this, arguments);
-                if (type === '2d') {
-                    const originalFillText = context.fillText;
-                    context.fillText = function() {
-                        arguments[0] = arguments[0] + ' ';
-                        return originalFillText.apply(this, arguments);
-                    }
-                }
-                return context;
-            };
-        """)
+        await context.add_init_script(S.SCRIPT)
        
         self.page = await context.new_page()
         await self.add_human_behavior()

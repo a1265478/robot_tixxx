@@ -1,8 +1,8 @@
 LOGIN_URL = 'https://tixcraft.com/'
 ACCOUNT = 'tixket000@gmail.com'
 PASSWORD = 'forgetP@ssw0rd'
-SELL_URL = 'https://tixcraft.com/ticket/area/25_jhope/19138'
-# SELL_URL = 'https://tixcraft.com/activity/game/25_taeyeon'
+# SELL_URL = 'https://tixcraft.com/activity/detail/25_isbalance'
+SELL_URL = 'https://tixcraft.com/activity/game/25_stayc'
 
 AREA_LOCATOR = 'div[class*="area-list"] li'
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"

@@ -13,6 +13,6 @@ TICKET_NUMBER = 1
 
 EXCLUDED_AREAS = ['已售完','身心障礙','身障','愛心','剩餘0']
 # PREFERRED_AREAS = ['A5區', 'A6區','A7區','A8區','A9區', 'A10區','A11區','A12區']
-PREFERRED_AREAS = ['A']
+PREFERRED_AREAS = []
 ONLY_PREFERRED_AREAS = False
 

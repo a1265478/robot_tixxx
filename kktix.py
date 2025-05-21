@@ -3,95 +3,77 @@ from playwright.async_api import async_playwright, TimeoutError
 import asyncio
 import os
 import kktix_setting
+import json
+from pathlib import Path
 import random
 from typing import Optional
 import time
 from random import uniform
- 
+from playwright_stealth import stealth_async
+import script as S
 
+SOURCE_COOKIE_FILE = "cookies.json"
+TARGET_COOKIE_FILE = "playwright_cookies.json"
+
+def normalize_cookies(cookies):
+    valid_same_site = {"Strict", "Lax", "None"}
+    for cookie in cookies:
+        ss = str(cookie.get("sameSite", "")).strip().lower()
+
+        # 修正常見錯誤值
+        if ss not in valid_same_site:
+            if ss in ["no_restriction", "unspecified"]:
+                cookie["sameSite"] = "None"  # 這是最寬鬆的選擇
+            elif ss == "lax":  # 正確
+                cookie["sameSite"] = "Lax"
+            elif ss == "strict":
+                cookie["sameSite"] = "Strict"
+            else:
+                cookie["sameSite"] = "Lax"  # 預設安全值
+
+    return cookies
 
 class TicketBot:
     def __init__(self):
         self.browser = None
         self.page = None
+        self.context = None
 
         
     async def init_browser(self):
         """Initialize browser with optimized settings"""
 
-        browser_args = [ 
-            '--disable-dev-shm-usage',
-            '--no-sandbox',
-            '--disable-blink-features=AutomationControlled',
-            '--disable-automation',
-            '--disable-infobars',
-            '--disable-blink-features',
-            '--disable-blink-features=AutomationControlled',
-            f'--window-size={random.randint(1050, 1200)},{random.randint(800, 900)}',
-            '--disable-gpu',
-        ]
-        
         playwright = await async_playwright().start()
         self.browser = await playwright.chromium.launch(
             headless=False,
             channel='chrome',
-            args=browser_args
+            args=S.BROWSER_ARGS,
         )
         
-        context = await self.browser.new_context(
+        self.context = await self.browser.new_context(
             viewport = kktix_setting.VIEWPORT,
             user_agent = kktix_setting.USER_AGENT,
             java_script_enabled=True,
             locale='zh-TW',
             timezone_id='Asia/Taipei',
             geolocation={'latitude': 25.0330, 'longitude': 121.5654},
-            permissions=['geolocation'],
-            color_scheme='light',
-            has_touch=True,
+            # extra_http_headers={
+            #     "Accept-Language": "zh-TW,zh;q=0.9",
+            #     "DNT": "1",
+            #     "Upgrade-Insecure-Requests": "1"
+            # }
         )
+        self.page = await self.context.new_page()
 
-        await context.add_init_script("""
-            
-            Object.defineProperty(navigator, 'webdriver', {get: () => false});
-            
-            
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => {
-                    return [{
-                        0: {type: "application/x-google-chrome-pdf"},
-                        description: "Portable Document Format",
-                        filename: "internal-pdf-viewer",
-                        name: "Chrome PDF Plugin"
-                    }];
-                }
-            });
-            
-            
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['zh-TW', 'zh', 'en-US', 'en']
-            });
-            
-            
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
-            
-            
-            const originalGetContext = HTMLCanvasElement.prototype.getContext;
-            HTMLCanvasElement.prototype.getContext = function(type) {
-                const context = originalGetContext.apply(this, arguments);
-                if (type === '2d') {
-                    const originalFillText = context.fillText;
-                    context.fillText = function() {
-                        arguments[0] = arguments[0] + ' ';
-                        return originalFillText.apply(this, arguments);
-                    }
-                }
-                return context;
-            };
+        await self.context.add_init_script(S.SCRIPT)
+        await self.context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            window.chrome = { runtime: {} };
+            Object.defineProperty(navigator, 'languages', { get: () => ['zh-TW', 'zh'] });
+            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
         """)
        
-        self.page = await context.new_page()
+        await stealth_async(self.page)
         await self.add_human_behavior()
 
     async def add_human_behavior(self):
@@ -204,20 +186,26 @@ class TicketBot:
         try:
             if await self.wait_for_clickable("#nav-user-display-id"):
                     return
+            
             await self.page.goto(kktix_setting.LOGIN_URL, wait_until='domcontentloaded')
-            await self.page.get_by_role("link", name="登入").click()
-            await self.page.get_by_role("textbox", name="使用者名稱或 Email").click()
-            await self.page.get_by_role("textbox", name="使用者名稱或 Email").fill(kktix_setting.ACCOUNT)
-            await self.page.wait_for_timeout(500)
-            await self.page.get_by_role("textbox", name="密碼").fill(kktix_setting.PASSWORD)
-            await self.page.get_by_role("button", name="登入").click()
-            while True:
-                print("等待登入...")
-                if await self.wait_for_clickable("#nav-user-display-id"):
-                    break
+            await self.page.pause()
+            # with open(TARGET_COOKIE_FILE, "r") as f:
+            #     raw_cookies = json.load(f)
+            #     cookies = normalize_cookies(raw_cookies)
+            # await self.context.add_cookies(cookies)
+            # await self.page.get_by_role("link", name="登入").click()
+            # await self.page.get_by_role("textbox", name="使用者名稱或 Email").click()
+            # await self.page.get_by_role("textbox", name="使用者名稱或 Email").fill(kktix_setting.ACCOUNT)
+            # await self.page.wait_for_timeout(500)
+            # await self.page.get_by_role("textbox", name="密碼").fill(kktix_setting.PASSWORD)
+            # await self.page.get_by_role("button", name="登入").click()
+            # while True:
+            #     print("等待登入...")
+            #     if await self.wait_for_clickable("#nav-user-display-id"):
+            #         break
 
             print("登入成功")
-
+ 
         except Exception as e:
             print(f"登入錯誤: {str(e)}")
 
@@ -331,6 +319,7 @@ class TicketBot:
                 print("搶票自動化流程結束")
                 print("搶票流程完成，瀏覽器保持開啟中，請手動關閉...")
                 print(f"總耗時: {end_time - start_time} 秒")
+                self.page.on("console", lambda msg: print(f"Console: {msg.text}"))
                 self.page.on("dialog", lambda dialog: print(f"發現對話框: {dialog.message}"))
                 await self.page.pause()
                 self.keep_running = asyncio.Event()  # 建立事件

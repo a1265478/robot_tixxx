@@ -24,7 +24,7 @@ X-XSRF-TOKEN: CfDJ8ATQjvx_LrtIoAKQbYzApU2At5TGxPktDUqe59z0M2uHc5YaqyPE7GP4W1qbLU
 
 
 ### Get areas list
-GET https://qwareticket-asysimg.azureedge.net/QWARE_TICKET/images/Temp/B08BRINL/1_B08BRINL_live.map?v=a6f73dd3-ea6f-4032-ba7c-1701454379b3 HTTP/2
+GET https://qwareticket-asysimg.azureedge.net/QWARE_TICKET/images/Temp/B08BRINL/1_B08BRINL_live.map?v=b42c5212-f9b9-442e-af5b-42aa2038e230 HTTP/2
 
 https://orders.ibon.com.tw/application/UTK02/UTK0201_000.aspx?PERFORMANCE_ID=B086TCFK&PRODUCT_ID=B086T34I&strItem=WEB%E7%B6%B2%E7%AB%99%E5%85%A5%E5%8F%A31&Token=MTE0LjQ1LjE5Mi4xMjR8MTc0MTUyMzE3MjgwN3xEdlRpUWdTL3ROVVQ5cEJheWFHeWRKN2thUjhoRzAwVW10emZvRERxVXJVPQ==
 

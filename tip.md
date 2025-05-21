@@ -6,5 +6,5 @@ python3 -m playwright install
 
 codegen
 ```
-python3 -m playwright codegen https://kktix.com/
+python3 -m playwright codegen https://www.livenation.com.tw/
 ```
