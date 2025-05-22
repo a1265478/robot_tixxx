@@ -1,7 +1,7 @@
 # Description: Setting for ibon ticketing
 LOGIN_URL = 'https://ticket.ibon.com.tw/'
-# SELL_URL = 'https://ticket.ibon.com.tw/ActivityInfo/Details/38735'
-SELL_URL = 'https://orders.ibon.com.tw/application/UTK02/UTK0201_001.aspx?PERFORMANCE_ID=B086TCFK&GROUP_ID=10&PERFORMANCE_PRICE_AREA_ID=B086W46O'
+SELL_URL = 'https://ticket.ibon.com.tw/ActivityInfo/Details/38960'
+# SELL_URL = 'https://orders.ibon.com.tw/application/UTK02/UTK0201_001.aspx?PERFORMANCE_ID=B086TCFK&GROUP_ID=10&PERFORMANCE_PRICE_AREA_ID=B086W46O'
 # SELL_URL = 'https://orders.ibon.com.tw/application/UTK02/UTK0201_000.aspx?PERFORMANCE_ID=B07ZNUBI&PRODUCT_ID=B07ZKHEO&strItem=WEB%E7%B6%B2%E7%AB%99%E5%85%A5%E5%8F%A31&Token=MTE0LjQ1LjE5My4xNzh8MTc0MTQ0NDE3MzQxMHxtZVViVnd1aEhzWE1PcTMwd296RnFpZEZ4cjFYbFQ4ZC9KbXNYSjU4N3JnPQ=='
 # SELL_URL = 'https://ticket.ibon.com.tw/ActivityInfo/Details/38834'
 # Description: Account
@@ -16,19 +16,19 @@ COOKIE = {
     'secure': True,
     'sameSite': 'Lax'
 }
-NEED_INPUT = True
+NEED_INPUT = False
 INPUT_VALUE = '515721'
 # Description: Robot setting
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 VIEWPORT = {'width': 1440, 'height': 1080}
 IMAGE_PATH = 'captcha.png'
 # Description: Hope
-TICKET_NUMBER = '2'
-EXCLUDED_AREAS = ['身障','搖滾','愛心','SUPER']
-PREFERRED_AREAS = ['6880','B2層特']
-ONLY_PREFERRED_AREAS = False
+TICKET_NUMBER = '1'
+EXCLUDED_AREAS = ['身障','搖滾','愛心','特1區']
+PREFERRED_AREAS = ['特3區']
+ONLY_PREFERRED_AREAS = True
 
-# API Setting
+# # API Setting
 HEADER = {
     'Host': 'ticketapi.ibon.com.tw',
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:136.0) Gecko/20100101 Firefox/136.0',
@@ -48,6 +48,6 @@ HEADER = {
     'X-XSRF-TOKEN': 'CfDJ8ATQjvx_LrtIoAKQbYzApU2At5TGxPktDUqe59z0M2uHc5YaqyPE7GP4W1qbLUivh3NwvC8yQjRttHVo0_CE5mEZmzf9kShmtEoFZJ6O0rF5VCGtedf4IAE_ZTylF44jmfYz8uHHUpNQOwJ3HsZ9q_U'
 }
 
-GAME_ID = 38834
+GAME_ID = 38960
 GAMES_API = 'https://ticketapi.ibon.com.tw/api/ActivityInfo/GetGameInfoList'
 AREA_API = 'https://qwareticket-asysimg.azureedge.net/QWARE_TICKET/images/Temp/{performance_id}/1_{performance_id}_live.map'

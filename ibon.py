@@ -15,8 +15,29 @@ from bs4 import BeautifulSoup
 import numpy as np
 import ddddocr
 from PIL import Image
+import json
 
 
+SOURCE_COOKIE_FILE = "ibon_cookies.json"
+
+
+def normalize_cookies(cookies):
+    valid_same_site = {"Strict", "Lax", "None"}
+    for cookie in cookies:
+        ss = str(cookie.get("sameSite", "")).strip().lower()
+
+        # 修正常見錯誤值
+        if ss not in valid_same_site:
+            if ss in ["no_restriction", "unspecified"]:
+                cookie["sameSite"] = "None"  # 這是最寬鬆的選擇
+            elif ss == "lax":  # 正確
+                cookie["sameSite"] = "Lax"
+            elif ss == "strict":
+                cookie["sameSite"] = "Strict"
+            else:
+                cookie["sameSite"] = "Lax"  # 預設安全值
+
+    return cookies
 class TicketBot:
     def __init__(self):
         self.browser = None
@@ -24,9 +45,6 @@ class TicketBot:
         self.performance_id = None
         self.product_id = None
         self.sell_url = None
-        
-        # self.ocr_browser = None
-        # self.ocr = None
         
     async def init_browser(self):
         """Initialize browser with optimized settings"""
@@ -61,12 +79,13 @@ class TicketBot:
             has_touch=True,
         )
 
-        await context.add_init_script(S.SCRIPT)
-        # await context.add_cookies([setting.COOKIE])
-        
+        await context.add_init_script(S.SCRIPT)        
         self.page = await context.new_page()
-        await self.page.goto(setting.LOGIN_URL, wait_until='domcontentloaded')
-        await self.page.pause()
+        with open(SOURCE_COOKIE_FILE, "r") as f:
+            raw_cookies = json.load(f)
+            cookies = normalize_cookies(raw_cookies)
+        await context.add_cookies(cookies)
+        await self.page.goto(setting.SELL_URL, wait_until='domcontentloaded')
         await self.add_human_behavior()
 
     async def add_human_behavior(self):
@@ -99,23 +118,24 @@ class TicketBot:
                     href = area.get('href', '')
                     title = area.get('title', '')
                     ticket_info = {}
-                    area_match = re.search(r'票區:([^票]+)票價：(\d+)\s+尚餘：(.+?)(?:"|\s*$)', title)
+                    area_match = re.search(r'票區:([^票]+)票價：(\d+)\s+尚餘：([^\s"]+)', title)
                     if area_match:
                         ticket_info['TicketArea'] = area_match.group(1).strip()
                         ticket_info['Price'] = area_match.group(2)
                         ticket_info['Remaining'] = area_match.group(3)
                         print(f"票區: {ticket_info['TicketArea']} 票價: {ticket_info['Price']} 尚餘: {ticket_info['Remaining']}")
-                        # 如果是排除區域，則跳過
                         if any(excluded_area in ticket_info['TicketArea'] for excluded_area in setting.EXCLUDED_AREAS):
                             continue
                         if ticket_info['Remaining'] == '0':
                             continue
                         await self.page.evaluate(href)
                         return True
+                    else:
+                        print(f"無法解析票區資訊{title}")
                 
                 print("沒有找到合適的票區，重新整理頁面")
                 await self.page.reload()
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(uniform(0.1, 0.2))
             else:
                 print(f"API 請求錯誤: {status_code}")
                 raise Exception(f"API 請求錯誤: {status_code}")
@@ -126,42 +146,81 @@ class TicketBot:
     async def wait_for_clickable(self, selector: str, timeout: int = 500) -> bool:
         """等待元素可點擊，有超時機制"""
         try:
-            element = self.page.locator(selector)
+            element = self.page.locator(selector).first
             await element.wait_for(state='visible', timeout=timeout)
             return True
         except TimeoutError:
             return False
 
+    # async def ready_to_buy(self):
+    #     """準備購買流程"""
+    #     try:
+    #         while True:
+    #             response = requests.post(
+    #                 setting.GAMES_API,headers=setting.HEADER,
+    #                 json={
+    #                     "id":setting.GAME_ID,
+    #                     "hasDeadline":True,
+    #                     "SystemBrowseType":0
+    #                 }
+    #             )
+    #             status_code = response.status_code
+    #             if status_code == 200:
+    #                 games = response.json()['Item']['GIHtmls']
+    #                 game = games[0]
+    #                 if game['Href'] is None:
+    #                     print("沒有找到遊戲")
+    #                     await asyncio.sleep(0.5)
+    #                 else:
+    #                     self.parser_game_info(game['Href'])
+    #                     break
+    #             else:
+    #                 print(f"API 請求錯誤: {status_code}")
+    #                 raise Exception(f"API 請求錯誤: {status_code}")
+            
+    #         await self.page.goto(self.sell_url,wait_until='domcontentloaded')  
+            
+    #     except Exception as e:
+    #         print(f"準備購買錯誤: {str(e)}")
     async def ready_to_buy(self):
         """準備購買流程"""
         try:
-            while True:
-                response = requests.post(
-                    setting.GAMES_API,headers=setting.HEADER,
-                    json={
-                        "id":setting.GAME_ID,
-                        "hasDeadline":True,
-                        "SystemBrowseType":0
-                    }
-                )
-                status_code = response.status_code
-                if status_code == 200:
-                    games = response.json()['Item']['GIHtmls']
-                    game = games[0]
-                    if game['Href'] is None:
-                        print("沒有找到遊戲")
-                        await asyncio.sleep(0.5)
-                    else:
-                        self.parser_game_info(game['Href'])
-                        break
-                else:
-                    print(f"API 請求錯誤: {status_code}")
-                    raise Exception(f"API 請求錯誤: {status_code}")
-            
-            await self.page.goto(self.sell_url,wait_until='domcontentloaded')  
-            
+            await self.page.goto(setting.SELL_URL, wait_until='domcontentloaded')
+            interval = 0.15
+            max_attempts = int(150 / interval)
+
+            for attempt in range(max_attempts):
+                try:
+                    resp = requests.post(
+                        setting.GAMES_API,
+                        headers=setting.HEADER,
+                        json={
+                            "id": setting.GAME_ID,
+                            "hasDeadline": True,
+                            "SystemBrowseType": 0
+                        },
+                        timeout=1 
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json().get('Item', {})
+                        htmls = data.get('GIHtmls') or []
+                        if htmls and htmls[0].get('Href'):
+                            href = htmls[0]['Href']
+                            self.parser_game_info(href)
+                            await self.page.goto(self.sell_url, wait_until='domcontentloaded')
+                            print("找到開賣連結")
+                            return
+                except Exception as e:
+                    pass
+
+                await asyncio.sleep(interval)
+
+            raise TimeoutError("超时：在规定时间内未取得开卖链接")
+
         except Exception as e:
-            print(f"準備購買錯誤: {str(e)}")
+            print(f"准备购买错误: {e}")
+            raise
+        
     def parser_game_info(self,url:str):
         parsed_url = urllib.parse.urlparse(url)
         query_params = urllib.parse.parse_qs(parsed_url.query)
@@ -195,7 +254,7 @@ class TicketBot:
         """
         try:
             # 等待對話框出現，但如果沒有也不報錯
-            dialog_button = self.page.locator("button:has-text('確定')")
+            dialog_button = self.page.locator("button:has-text('確定')").first
             is_visible = await dialog_button.is_visible()
             
             if is_visible:
@@ -213,12 +272,12 @@ class TicketBot:
         """選擇票數若不夠就選擇最大數"""
         try:
             if await self.wait_for_clickable("select"):
-                options = await self.page.locator('select option').all_text_contents()
+                options = await self.page.locator('select option').first.all_text_contents()
                 if setting.TICKET_NUMBER in options:
-                    await self.page.locator('select').select_option(setting.TICKET_NUMBER)
+                    await self.page.locator('select').first.select_option(setting.TICKET_NUMBER)
                 else:
                     max_option = max(options, key=lambda x: int(x))
-                    await self.page.locator('select').select_option(max_option)
+                    await self.page.locator('select').first.select_option(max_option)
                 
         except Exception as e:
             print(f"選擇票數錯誤: {str(e)}")
@@ -232,7 +291,7 @@ class TicketBot:
                 await self.page.go_back()
                 await self.select_area()
                 return
-            element = self.page.locator('#ctl00_ContentPlaceHolder1_DataGrid_ctl02_AMOUNT_DDL')
+            element = self.page.locator('#ctl00_ContentPlaceHolder1_DataGrid_ctl02_AMOUNT_DDL').first
             await element.is_visible(timeout=500)
             await element.select_option(setting.TICKET_NUMBER)
                 
@@ -246,7 +305,7 @@ class TicketBot:
     async def enter_member_number(self):
         """輸入會員號碼"""
         try:
-            await self.page.locator('#ctl00_ContentPlaceHolder1_Txt_id_name').fill(setting.INPUT_VALUE)
+            await self.page.locator('#ctl00_ContentPlaceHolder1_Txt_id_name').first.fill(setting.INPUT_VALUE)
             await self.page.get_by_role("link", name="送出").click()
         except Exception as e:
             print(f"輸入會員號碼錯誤: {str(e)}")
@@ -288,8 +347,8 @@ class TicketBot:
                 image = f.read()
             result = ocr.classification(image)
             print(result)
-            await self.page.locator("#ctl00_ContentPlaceHolder1_CHK").fill(result)
-            await self.page.locator("#Next div").click()
+            await self.page.locator("#ctl00_ContentPlaceHolder1_CHK").first.fill(result)
+            await self.page.locator("#Next div").first.click()
         except Exception as e:
             print(f"驗證驗證碼錯誤: {str(e)}")
 
@@ -300,7 +359,7 @@ class TicketBot:
         try:
             await self.init_browser()
            
-            # await self.ready_to_buy()
+            await self.ready_to_buy()
                         
             while True:
                 try:
