@@ -1,20 +1,18 @@
 from playwright.async_api import async_playwright, TimeoutError
-
 import asyncio
-import os
 import tixcraft_setting
 import random
-from typing import Optional
 import time
 from random import uniform
 import script as S
+
 
 class TicketBot:
     def __init__(self):
         self.browser = None
         self.page = None
-        # self.ocr_browser = None
-        # self.ocr = None
+        self.last_dialog_message = None
+
         
     async def init_browser(self):
         """Initialize browser with optimized settings"""
@@ -42,8 +40,16 @@ class TicketBot:
         await context.add_init_script(S.SCRIPT)
        
         self.page = await context.new_page()
-        
+        self.page.on("dialog", lambda dialog: self._on_dialog(dialog))
         await self.add_human_behavior()
+
+    async def _on_dialog(self, dialog):
+        # 拿到訊息並存起來
+        self.last_dialog_message = dialog.message
+        print(f"[Dialog] type={dialog.type} message={dialog.message!r}")
+        # 接著決定要 accept 還是 dismiss
+        # alert、confirm 預設都 accept；prompt 可以傳入 text
+        await dialog.accept()
 
     async def add_human_behavior(self):
         """Add random delays and mouse movements to simulate human behavior"""
@@ -184,10 +190,11 @@ class TicketBot:
     async def click_buy_now(self):
         """點擊立即購買按鈕"""
         try:
+            await self.page.get_by_role("button", name="立即訂購").click(timeout=100)
             # element = self.page.get_by_role("row", name="2025/06/29 (日) 18:00 2025").get_by_role("button")
-            element = await self.wait_for_clickable("button:text('立即訂購')",timeout=100)
-            await element.wait_for(state='visible', timeout=100)
-            await element.click()
+            # element = await self.wait_for_clickable("button:text('立即訂購')",timeout=100)
+            # await element.wait_for(state='visible', timeout=100)
+            # await element.click()
             # if await self.wait_for_clickable("button:text('立即訂購')"):
             #     await self.page.locator('button:text("立即訂購")').click()
         except Exception as e:
@@ -269,6 +276,14 @@ class TicketBot:
             await self.choose_ticket_count()
             await self.page.locator('#TicketForm_agree').check(timeout=500)
             await self.page.get_by_placeholder("請輸入驗證碼").click(timeout=500)
+            code = None
+            try:
+                with open("captcha.txt", "r", encoding="utf-8") as f:
+                    code = f.read().strip().lower()
+            except FileNotFoundError:
+                raise RuntimeError("找不到 captcha.txt，請先建立並輸入驗證碼")
+            if len(code) == 4:
+                captcha_text = await self.page.locator("input[placeholder='請輸入驗證碼']").fill(code,timeout=500)
             while True:
                 if await self.wait_for_clickable("input[placeholder='請輸入驗證碼']"):
                     captcha_text = await self.page.locator("input[placeholder='請輸入驗證碼']").input_value(timeout=500)
