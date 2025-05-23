@@ -5,6 +5,7 @@ import random
 import time
 from random import uniform
 import script as S
+import simpleaudio as sa
 
 
 class TicketBot:
@@ -273,6 +274,11 @@ class TicketBot:
     async def commit_to_buy(self):
         """確認購買"""
         try:
+            try:
+                wave_obj = sa.WaveObject.from_wave_file(tixcraft_setting.SOUND)
+                wave_obj.play()
+            except:
+                print("無法播放音效，請檢查音效文件")
             await self.choose_ticket_count()
             await self.page.locator('#TicketForm_agree').check(timeout=500)
             await self.page.get_by_placeholder("請輸入驗證碼").click(timeout=500)

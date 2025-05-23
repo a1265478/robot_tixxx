@@ -15,7 +15,7 @@ OCR_TEXT_LOCATOR = "div[jsname='JdLDjd']"
 NEED_INPUT = False
 MEMBER_NUMBER = ''
 TICKET_NUMBER = '1'
-EXCLUDED_AREAS = ['身障','愛心','A區','C區']
+EXCLUDED_AREAS = ['身障','愛心','A區','C區','D區']
 PREFERRED_AREAS = []
 ONLY_PREFERRED_AREAS = False
-SOUND = 'alert.mp3'
+SOUND = 'assets/ding-dong.wav'

@@ -18,7 +18,7 @@ from PIL import Image
 import json
 
 
-SOURCE_COOKIE_FILE = "ibon_cookies.json"
+SOURCE_COOKIE_FILE = "ibon_cookies2.json"
 
 
 def normalize_cookies(cookies):
@@ -204,12 +204,20 @@ class TicketBot:
                     if resp.status_code == 200:
                         data = resp.json().get('Item', {})
                         htmls = data.get('GIHtmls') or []
-                        if htmls and htmls[0].get('Href'):
-                            href = htmls[0]['Href']
+                        for html in htmls:
+                            if setting.PREFERRED_SESSION not in  html.get('ShowSaleDate'):
+                                continue
+                            if html.get('Href') is None:
+                                print("沒有找到遊戲")
+                                break
+                            href = html.get('Href')
                             self.parser_game_info(href)
-                            await self.page.goto(self.sell_url, wait_until='domcontentloaded')
                             print("找到開賣連結")
+                            await self.page.goto(self.sell_url, wait_until='domcontentloaded')
                             return
+                     
+
+                       
                 except Exception as e:
                     pass
 
