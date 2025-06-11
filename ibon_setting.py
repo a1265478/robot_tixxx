@@ -1,6 +1,6 @@
 # Description: Setting for ibon ticketing
 LOGIN_URL = 'https://ticket.ibon.com.tw/'
-SELL_URL = 'https://ticket.ibon.com.tw/ActivityInfo/Details/38969'
+SELL_URL = 'https://ticket.ibon.com.tw/ActivityInfo/Details/38953'
 # SELL_URL = 'https://orders.ibon.com.tw/application/UTK02/UTK0201_001.aspx?PERFORMANCE_ID=B086TCFK&GROUP_ID=10&PERFORMANCE_PRICE_AREA_ID=B086W46O'
 # SELL_URL = 'https://orders.ibon.com.tw/application/UTK02/UTK0201_000.aspx?PERFORMANCE_ID=B07ZNUBI&PRODUCT_ID=B07ZKHEO&strItem=WEB%E7%B6%B2%E7%AB%99%E5%85%A5%E5%8F%A31&Token=MTE0LjQ1LjE5My4xNzh8MTc0MTQ0NDE3MzQxMHxtZVViVnd1aEhzWE1PcTMwd296RnFpZEZ4cjFYbFQ4ZC9KbXNYSjU4N3JnPQ=='
 # SELL_URL = 'https://ticket.ibon.com.tw/ActivityInfo/Details/38834'
@@ -23,12 +23,12 @@ USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 VIEWPORT = {'width': 1440, 'height': 1080}
 IMAGE_PATH = 'captcha.png'
 # Description: Hope
-TICKET_NUMBER = '2'
+TICKET_NUMBER = '1'
 EXCLUDED_AREAS = ['身障','搖滾','愛心','一般區','敬老']
-PREFERRED_AREAS = ['超級搖滾區']
-ONLY_PREFERRED_AREAS = True
-PREFERRED_SESSION = '2025/07/05'
-
+PREFERRED_AREAS = []
+ONLY_PREFERRED_AREAS = False
+PREFERRED_SESSION = '2025/06/28'
+SOUND = 'assets/ding-dong.wav'
 # # API Setting
 HEADER = {
     'Host': 'ticketapi.ibon.com.tw',

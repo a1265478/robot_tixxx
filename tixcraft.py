@@ -46,11 +46,17 @@ class TicketBot:
 
     async def _on_dialog(self, dialog):
         # 拿到訊息並存起來
-        self.last_dialog_message = dialog.message
-        print(f"[Dialog] type={dialog.type} message={dialog.message!r}")
-        # 接著決定要 accept 還是 dismiss
-        # alert、confirm 預設都 accept；prompt 可以傳入 text
-        await dialog.accept()
+        try:
+            print(f"[Dialog] type={dialog.type} message={dialog.message!r}")
+            if("不正確" in dialog.message):
+                try:
+                    with open("captcha.txt", "r", encoding="utf-8") as f:
+                        f.write('')
+                except FileNotFoundError:
+                    raise RuntimeError("找不到 captcha.txt，請先建立並輸入驗證碼")
+            # await dialog.accept()
+        except:
+            print("Dialog error")
 
     async def add_human_behavior(self):
         """Add random delays and mouse movements to simulate human behavior"""
@@ -70,7 +76,7 @@ class TicketBot:
         try:
             while True:
                 # 等待區域選項出現
-                await self.page.wait_for_selector(tixcraft_setting.AREA_LOCATOR)
+                await self.page.wait_for_selector(tixcraft_setting.AREA_LOCATOR,timeout=1000)
                 
                 # 獲取所有區域元素
                 areas = await self.page.query_selector_all(tixcraft_setting.AREA_LOCATOR)
@@ -191,7 +197,7 @@ class TicketBot:
     async def click_buy_now(self):
         """點擊立即購買按鈕"""
         try:
-            await self.page.get_by_role("button", name="立即訂購").click(timeout=100)
+            await self.page.get_by_role("button", name="立即訂購").first.click(timeout=100)
             # element = self.page.get_by_role("row", name="2025/06/29 (日) 18:00 2025").get_by_role("button")
             # element = await self.wait_for_clickable("button:text('立即訂購')",timeout=100)
             # await element.wait_for(state='visible', timeout=100)
@@ -199,7 +205,7 @@ class TicketBot:
             # if await self.wait_for_clickable("button:text('立即訂購')"):
             #     await self.page.locator('button:text("立即訂購")').click()
         except Exception as e:
-            print(f"點擊立即購買按鈕錯誤: {str(e)}")
+            print(f"點擊立即購買按鈕錯誤")
    
     async def navigate_to_sell_page(self):
         """執行初始導航和表單填寫，使用最小等待時間"""
@@ -266,20 +272,27 @@ class TicketBot:
             inputs = await self.page.query_selector_all('input[type="text"]')
             if len(inputs) > 1 and tixcraft_setting.NEED_INPUT:
                 await inputs[1].fill(tixcraft_setting.MEMBER_NUMBER)
-                self.page.on("dialog", lambda dialog: dialog.accept())
+                
                 await self.page.get_by_role("button", name="送出").click()
+                self.page.on("dialog", lambda dialog: dialog.accept())
+
         except Exception as e:
             print(f"輸入會員號碼錯誤: {str(e)}")
+
+    def play_sound(self):
+        try:
+            wave_obj = sa.WaveObject.from_wave_file(tixcraft_setting.SOUND)
+            play_obj = wave_obj.play()
+            play_obj.wait_done()
+        except:
+            print("無法播放音效，請檢查音效文件")
 
     async def commit_to_buy(self):
         """確認購買"""
         try:
-            try:
-                wave_obj = sa.WaveObject.from_wave_file(tixcraft_setting.SOUND)
-                wave_obj.play()
-            except:
-                print("無法播放音效，請檢查音效文件")
-            await self.choose_ticket_count()
+            # await self.play_sound()
+            await self.try_to_choose_max_ticket()
+            await asyncio.sleep(uniform(0.2, 0.3))
             await self.page.locator('#TicketForm_agree').check(timeout=500)
             await self.page.get_by_placeholder("請輸入驗證碼").click(timeout=500)
             code = None
@@ -300,7 +313,7 @@ class TicketBot:
                 else: 
                     break
         except Exception as e:
-            print(f"確認購買錯誤: {str(e)}")
+            print(f"選張數確認購買錯誤: {str(e)}")
 
     async def check_is_success(self):   
         try:
@@ -342,6 +355,7 @@ class TicketBot:
                     if 'ticket/ticket' in self.page.url:
                         await self.commit_to_buy()
                     if 'order' in self.page.url:
+                        print('Searching')
                         await self.page.wait_for_timeout(random.randint(500, 1000))
                     if 'checkout' in self.page.url:
                         break

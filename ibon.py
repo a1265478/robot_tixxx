@@ -16,9 +16,10 @@ import numpy as np
 import ddddocr
 from PIL import Image
 import json
+import simpleaudio as sa
 
 
-SOURCE_COOKIE_FILE = "ibon_cookies2.json"
+SOURCE_COOKIE_FILE = "ibon_cookies.json"
 
 
 def normalize_cookies(cookies):
@@ -42,9 +43,9 @@ class TicketBot:
     def __init__(self):
         self.browser = None
         self.page = None
-        self.performance_id = None
-        self.product_id = None
-        self.sell_url = None
+        self.performance_id = 'B08R6TLG'
+        self.product_id = 'B08QMPH9'
+        self.sell_url = 'https://orders.ibon.com.tw/application/UTK02/UTK0201_000.aspx?PERFORMANCE_ID=B08R6TLG&PRODUCT_ID=B08QMPH9&strItem=WEB%E7%B6%B2%E7%AB%99%E5%85%A5%E5%8F%A31'
         
     async def init_browser(self):
         """Initialize browser with optimized settings"""
@@ -359,7 +360,14 @@ class TicketBot:
             await self.page.locator("#Next div").first.click()
         except Exception as e:
             print(f"驗證驗證碼錯誤: {str(e)}")
-
+    async def play_sound(self):
+        """播放聲音提示"""
+        try:
+            wave_obj = sa.WaveObject.from_wave_file(setting.SOUND)
+            play_obj = wave_obj.play()
+            play_obj.wait_done()
+        except Exception as e:
+            print(f"播放聲音錯誤: {str(e)}")
     async def run(self):
         """主要運行流程"""
         start_time = time.time()
@@ -367,7 +375,7 @@ class TicketBot:
         try:
             await self.init_browser()
            
-            await self.ready_to_buy()
+            # await self.ready_to_buy()
                         
             while True:
                 try:
@@ -402,6 +410,7 @@ class TicketBot:
         finally:
             if self.browser:
                 end_time = time.time()
+                await self.play_sound()
                 print("搶票自動化流程結束")
                 print("搶票流程完成，瀏覽器保持開啟中，請手動關閉...")
                 print(f"總耗時: {end_time - start_time} 秒")
