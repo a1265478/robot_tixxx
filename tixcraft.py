@@ -5,7 +5,7 @@ import random
 import time
 from random import uniform
 import script as S
-import simpleaudio as sa
+import requests
 
 
 class TicketBot:
@@ -50,11 +50,11 @@ class TicketBot:
             print(f"[Dialog] type={dialog.type} message={dialog.message!r}")
             if("不正確" in dialog.message):
                 try:
-                    with open("captcha.txt", "r", encoding="utf-8") as f:
+                    with open(tixcraft_setting.CAPTCHA, "r", encoding="utf-8") as f:
                         f.write('')
                 except FileNotFoundError:
                     raise RuntimeError("找不到 captcha.txt，請先建立並輸入驗證碼")
-            # await dialog.accept()
+            await dialog.accept()
         except:
             print("Dialog error")
 
@@ -279,25 +279,17 @@ class TicketBot:
         except Exception as e:
             print(f"輸入會員號碼錯誤: {str(e)}")
 
-    def play_sound(self):
-        try:
-            wave_obj = sa.WaveObject.from_wave_file(tixcraft_setting.SOUND)
-            play_obj = wave_obj.play()
-            play_obj.wait_done()
-        except:
-            print("無法播放音效，請檢查音效文件")
 
     async def commit_to_buy(self):
         """確認購買"""
         try:
-            # await self.play_sound()
+            self.alert_discord('請輸入驗證碼')
             await self.try_to_choose_max_ticket()
-            await asyncio.sleep(uniform(0.2, 0.3))
             await self.page.locator('#TicketForm_agree').check(timeout=500)
             await self.page.get_by_placeholder("請輸入驗證碼").click(timeout=500)
             code = None
             try:
-                with open("captcha.txt", "r", encoding="utf-8") as f:
+                with open(tixcraft_setting.CAPTCHA, "r", encoding="utf-8") as f:
                     code = f.read().strip().lower()
             except FileNotFoundError:
                 raise RuntimeError("找不到 captcha.txt，請先建立並輸入驗證碼")
@@ -331,6 +323,17 @@ class TicketBot:
         except:
             pass
 
+    async def alert_discord(self,content):
+        message = {
+            "content": content
+        }
+        response = requests.post(tixcraft_setting.WEBHOOK, json=message)
+
+        if response.status_code == 204:
+            print("通知已成功發送到 Discord！")
+        else:
+            print(f"發送失敗，狀態碼：{response.status_code}，回應：{response.text}")
+
     async def run(self):
         """主要運行流程"""
         start_time = time.time()
@@ -346,6 +349,8 @@ class TicketBot:
 
             while True: 
                 try:
+                    if 'detail' in self.page.url:
+                        await self.page .goto(self.page.url.replace('detail','game'))
                     if 'game' in self.page.url:
                         await self.click_buy_now()
                     if 'verify' in self.page.url:
@@ -358,6 +363,7 @@ class TicketBot:
                         print('Searching')
                         await self.page.wait_for_timeout(random.randint(500, 1000))
                     if 'checkout' in self.page.url:
+                        await self.alert_discord('搶到票囉')
                         break
                     
                 except Exception as e:

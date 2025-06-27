@@ -14,45 +14,6 @@
     },
     {
         "domain": ".ibon.com.tw",
-        "expirationDate": 1782531013.514205,
-        "hostOnly": false,
-        "httpOnly": false,
-        "name": "__utma",
-        "path": "/",
-        "sameSite": "unspecified",
-        "secure": false,
-        "session": false,
-        "storeId": "0",
-        "value": "168771833.1241025374.1741576098.1747881313.1747971014.3"
-    },
-    {
-        "domain": ".ibon.com.tw",
-        "expirationDate": 1763739013,
-        "hostOnly": false,
-        "httpOnly": false,
-        "name": "__utmz",
-        "path": "/",
-        "sameSite": "unspecified",
-        "secure": false,
-        "session": false,
-        "storeId": "0",
-        "value": "168771833.1747971014.3.2.utmcsr=ticket.ibon.com.tw|utmccn=(referral)|utmcmd=referral|utmcct=/"
-    },
-    {
-        "domain": ".ibon.com.tw",
-        "expirationDate": 1748226865,
-        "hostOnly": false,
-        "httpOnly": false,
-        "name": "lastUrl",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": true,
-        "session": false,
-        "storeId": "0",
-        "value": "%2FActivityInfo%2FDetails%2F38953"
-    },
-    {
-        "domain": ".ibon.com.tw",
         "hostOnly": false,
         "httpOnly": false,
         "name": "ibon-lang",
@@ -65,7 +26,7 @@
     },
     {
         "domain": ".ibon.com.tw",
-        "expirationDate": 1748312074,
+        "expirationDate": 1751093301,
         "hostOnly": false,
         "httpOnly": false,
         "name": "_gid",
@@ -74,24 +35,62 @@
         "secure": false,
         "session": false,
         "storeId": "0",
-        "value": "GA1.3.953087731.1748225516"
+        "value": "GA1.3.1323650976.1750996458"
     },
     {
         "domain": ".ibon.com.tw",
-        "expirationDate": 1782785665.626672,
+        "expirationDate": 1785566397.152609,
         "hostOnly": false,
         "httpOnly": false,
-        "name": "_ga_0WBR78PRVP",
+        "name": "__utma",
         "path": "/",
         "sameSite": "unspecified",
         "secure": false,
         "session": false,
         "storeId": "0",
-        "value": "GS2.1.s1748225490$o9$g1$t1748225665$j60$l0$h0$dvgc7oT3so5IYdCUiMLWi3uU7UOVPfengLA"
+        "value": "168771833.1241025374.1741576098.1747971014.1751006397.4"
     },
     {
         "domain": ".ibon.com.tw",
-        "expirationDate": 1748232874.29187,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "__utmc",
+        "path": "/",
+        "sameSite": "unspecified",
+        "secure": false,
+        "session": true,
+        "storeId": "0",
+        "value": "168771833"
+    },
+    {
+        "domain": ".ibon.com.tw",
+        "expirationDate": 1766774397,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "__utmz",
+        "path": "/",
+        "sameSite": "unspecified",
+        "secure": false,
+        "session": false,
+        "storeId": "0",
+        "value": "168771833.1751006397.4.3.utmcsr=ticket.ibon.com.tw|utmccn=(referral)|utmcmd=referral|utmcct=/"
+    },
+    {
+        "domain": ".ibon.com.tw",
+        "expirationDate": 1751008197,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "__utmb",
+        "path": "/",
+        "sameSite": "unspecified",
+        "secure": false,
+        "session": false,
+        "storeId": "0",
+        "value": "168771833.1.10.1751006397"
+    },
+    {
+        "domain": ".ibon.com.tw",
+        "expirationDate": 1751014308.831095,
         "hostOnly": false,
         "httpOnly": false,
         "name": "ibonqware",
@@ -100,24 +99,11 @@
         "secure": true,
         "session": false,
         "storeId": "0",
-        "value": "mem_id=76689141722112888471&mem_email=a1265478@gmail.com&huiwanTK=BGyN1taphCNM4gHCVZFE/Q4abSPtX5KwRC+Uub8XISblDRWF0Slx5hMVWQ+jsdHFA7TsXd6iukI0NqGLc2I7DTBH+bsr0yU4y9s7KCmWODE=&ibonqwareverify=2b482221cb55b5afb303&datatime=202505261014&checksum=c8af4b2188bbe8b16f78d1848c1ee142"
+        "value": "mem_id=76689141722112888471&mem_email=a1265478@gmail.com&huiwanTK=k00ASDwIv7hY18XQiXYoiSkeLWiTLqTpejpG5DCFNINx1zpBdtNFJKhCeqt58scCrE3j4O+1HfVKwZF0SqjevDYttpayyIo+QVYBkRmp5dY=&ibonqwareverify=2b482221cb55b5afb303&datatime=202506271448&checksum=4df212ecafbc283c280c5c0b92edfffa"
     },
     {
         "domain": ".ibon.com.tw",
-        "expirationDate": 1748225734,
-        "hostOnly": false,
-        "httpOnly": false,
-        "name": "_gat",
-        "path": "/",
-        "sameSite": "unspecified",
-        "secure": false,
-        "session": false,
-        "storeId": "0",
-        "value": "1"
-    },
-    {
-        "domain": ".ibon.com.tw",
-        "expirationDate": 1782785674.749401,
+        "expirationDate": 1785566901.770951,
         "hostOnly": false,
         "httpOnly": false,
         "name": "_ga",
@@ -126,11 +112,11 @@
         "secure": false,
         "session": false,
         "storeId": "0",
-        "value": "GA1.1.1241025374.1741576098"
+        "value": "GA1.3.1241025374.1741576098"
     },
     {
         "domain": ".ibon.com.tw",
-        "expirationDate": 1782785674.90273,
+        "expirationDate": 1785567003.692038,
         "hostOnly": false,
         "httpOnly": false,
         "name": "_ga_XFDSQJ66GZ",
@@ -139,92 +125,80 @@
         "secure": false,
         "session": false,
         "storeId": "0",
-        "value": "GS2.1.s1748225516$o8$g1$t1748225674$j0$l0$h0"
+        "value": "GS2.1.s1751006367$o12$g1$t1751007003$j60$l0$h0"
     },
     {
-        "domain": "orders.ibon.com.tw",
+        "domain": ".ibon.com.tw",
+        "expirationDate": 1751008308,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "lastUrl",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": "0",
+        "value": "%2FActivityInfo%2FDetails%2F38958"
+    },
+    {
+        "domain": ".ibon.com.tw",
+        "expirationDate": 1785567108.724338,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "_ga_0WBR78PRVP",
+        "path": "/",
+        "sameSite": "unspecified",
+        "secure": false,
+        "session": false,
+        "storeId": "0",
+        "value": "GS2.1.s1750996454$o10$g1$t1751007108$j57$l0$h0"
+    },
+    {
+        "domain": "ticket.ibon.com.tw",
         "hostOnly": true,
         "httpOnly": false,
-        "name": "ApplicationGatewayAffinityCORS",
+        "name": "ApplicationGatewayAffinityDfn1CORS",
         "path": "/",
         "sameSite": "no_restriction",
         "secure": true,
         "session": true,
         "storeId": "0",
-        "value": "a07f93bd9edbc36924d0fd0d1a9c0e1c"
+        "value": "1df0e388cc92e1defd303ac19b6e024d"
     },
     {
-        "domain": "orders.ibon.com.tw",
+        "domain": "ticket.ibon.com.tw",
         "hostOnly": true,
         "httpOnly": false,
-        "name": "ApplicationGatewayAffinity",
+        "name": "ApplicationGatewayAffinityDfn1",
         "path": "/",
         "sameSite": "unspecified",
         "secure": false,
         "session": true,
         "storeId": "0",
-        "value": "a07f93bd9edbc36924d0fd0d1a9c0e1c"
+        "value": "1df0e388cc92e1defd303ac19b6e024d"
     },
     {
-        "domain": "orders.ibon.com.tw",
+        "domain": "ticket.ibon.com.tw",
         "hostOnly": true,
-        "httpOnly": true,
-        "name": "ASP.NET_SessionId",
+        "httpOnly": false,
+        "name": "ApplicationGatewayAffinityDfn2CORS",
         "path": "/",
-        "sameSite": "lax",
+        "sameSite": "no_restriction",
         "secure": true,
         "session": true,
         "storeId": "0",
-        "value": "2plzrhkouvmjt5nw3yp0lfmf"
+        "value": "69b199e416d447a00ec5039647662862"
     },
     {
-        "domain": ".orders.ibon.com.tw",
-        "expirationDate": 1748229115.81041,
-        "hostOnly": false,
-        "httpOnly": true,
-        "name": "TiPMix",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": true,
-        "session": false,
-        "storeId": "0",
-        "value": "44.65361632026056"
-    },
-    {
-        "domain": ".orders.ibon.com.tw",
-        "expirationDate": 1748229115.810437,
-        "hostOnly": false,
-        "httpOnly": true,
-        "name": "x-ms-routing-name",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": true,
-        "session": false,
-        "storeId": "0",
-        "value": "self"
-    },
-    {
-        "domain": ".orders.ibon.com.tw",
-        "hostOnly": false,
-        "httpOnly": true,
-        "name": "ARRAffinity",
+        "domain": "ticket.ibon.com.tw",
+        "hostOnly": true,
+        "httpOnly": false,
+        "name": "ApplicationGatewayAffinityDfn2",
         "path": "/",
         "sameSite": "unspecified",
-        "secure": true,
+        "secure": false,
         "session": true,
         "storeId": "0",
-        "value": "b669184ce84a8e059755ff8724db57ab2f7900bbfc1370a940bad1f018bf0ad1"
-    },
-    {
-        "domain": ".orders.ibon.com.tw",
-        "hostOnly": false,
-        "httpOnly": true,
-        "name": "ARRAffinitySameSite",
-        "path": "/",
-        "sameSite": "no_restriction",
-        "secure": true,
-        "session": true,
-        "storeId": "0",
-        "value": "b669184ce84a8e059755ff8724db57ab2f7900bbfc1370a940bad1f018bf0ad1"
+        "value": "69b199e416d447a00ec5039647662862"
     }
 ]

@@ -16,7 +16,6 @@ import numpy as np
 import ddddocr
 from PIL import Image
 import json
-import simpleaudio as sa
 
 
 SOURCE_COOKIE_FILE = "ibon_cookies.json"
@@ -43,9 +42,9 @@ class TicketBot:
     def __init__(self):
         self.browser = None
         self.page = None
-        self.performance_id = 'B08R6TLG'
-        self.product_id = 'B08QMPH9'
-        self.sell_url = 'https://orders.ibon.com.tw/application/UTK02/UTK0201_000.aspx?PERFORMANCE_ID=B08R6TLG&PRODUCT_ID=B08QMPH9&strItem=WEB%E7%B6%B2%E7%AB%99%E5%85%A5%E5%8F%A31'
+        self.performance_id = None
+        self.product_id = None
+        self.sell_url = None
         
     async def init_browser(self):
         """Initialize browser with optimized settings"""
@@ -206,7 +205,7 @@ class TicketBot:
                         data = resp.json().get('Item', {})
                         htmls = data.get('GIHtmls') or []
                         for html in htmls:
-                            if setting.PREFERRED_SESSION not in  html.get('ShowSaleDate'):
+                            if setting.PREFERRED_SESSION not in  html.get('GameInfoName'):
                                 continue
                             if html.get('Href') is None:
                                 print("沒有找到遊戲")
@@ -314,7 +313,8 @@ class TicketBot:
     async def enter_member_number(self):
         """輸入會員號碼"""
         try:
-            await self.page.locator('#ctl00_ContentPlaceHolder1_Txt_id_name').first.fill(setting.INPUT_VALUE)
+            await self.page.locator('#ctl00_ContentPlaceHolder1_Txt_id_name').first.fill(setting.INPUT_VALUE)            
+            await self.page.locator('#ctl00$ContentPlaceHolder1$Txt_password_name').first.fill(setting.INPUT_VALUE2)
             await self.page.get_by_role("link", name="送出").click()
         except Exception as e:
             print(f"輸入會員號碼錯誤: {str(e)}")
@@ -360,14 +360,7 @@ class TicketBot:
             await self.page.locator("#Next div").first.click()
         except Exception as e:
             print(f"驗證驗證碼錯誤: {str(e)}")
-    async def play_sound(self):
-        """播放聲音提示"""
-        try:
-            wave_obj = sa.WaveObject.from_wave_file(setting.SOUND)
-            play_obj = wave_obj.play()
-            play_obj.wait_done()
-        except Exception as e:
-            print(f"播放聲音錯誤: {str(e)}")
+     
     async def run(self):
         """主要運行流程"""
         start_time = time.time()
@@ -375,7 +368,7 @@ class TicketBot:
         try:
             await self.init_browser()
            
-            # await self.ready_to_buy()
+            await self.ready_to_buy()
                         
             while True:
                 try:
@@ -410,7 +403,6 @@ class TicketBot:
         finally:
             if self.browser:
                 end_time = time.time()
-                await self.play_sound()
                 print("搶票自動化流程結束")
                 print("搶票流程完成，瀏覽器保持開啟中，請手動關閉...")
                 print(f"總耗時: {end_time - start_time} 秒")
