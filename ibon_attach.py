@@ -21,6 +21,7 @@ import json
 
 class TicketBot:
     def __init__(self):
+        self.context = None
         self.browser = None
         self.page = None
         self.performance_id = None
@@ -31,31 +32,12 @@ class TicketBot:
         """Initialize browser with optimized settings"""
         
         playwright = await async_playwright().start()
-        user_data_dir = setting.USER_DATA_DIR
-        context = await playwright.chromium.launch_persistent_context(
-            user_data_dir,
-            headless=False,
-            channel='chrome',
-            args=S.BROWSER_ARGS,
-            viewport=setting.VIEWPORT,
-            user_agent=setting.USER_AGENT,
-            java_script_enabled=True,
-            locale='zh-TW',
-            timezone_id='Asia/Taipei',
-            geolocation={'latitude': 25.0330, 'longitude': 121.5654},
-            permissions=['geolocation'],
-            color_scheme='light',
-        )
-        self.page = await context.new_page()
-        
-
-        await self.page.add_init_script(S.SCRIPT)
-        
-        self.page.set_default_timeout(15000)
-        self.page.set_default_navigation_timeout(15000+ 5000)
+        browser = await playwright.chromium.connect_over_cdp("http://localhost:9222")
+        self.context = browser.contexts[0]
+        self.page = self.context.pages[0] 
+       
         self.page.on("dialog", lambda dialog: self._on_dialog(dialog))
         await self.add_human_behavior()
-        await self.page.goto("https://nowsecure.nl/", wait_until='domcontentloaded')
 
     async def add_human_behavior(self):
         """Add random delays and mouse movements to simulate human behavior"""
@@ -130,83 +112,59 @@ class TicketBot:
         except TimeoutError:
             return False
 
-    # async def ready_to_buy(self):
-    #     """準備購買流程"""
-    #     try:
-    #         while True:
-    #             response = requests.post(
-    #                 setting.GAMES_API,headers=setting.HEADER,
-    #                 json={
-    #                     "id":setting.GAME_ID,
-    #                     "hasDeadline":True,
-    #                     "SystemBrowseType":0
-    #                 }
-    #             )
-    #             status_code = response.status_code
-    #             if status_code == 200:
-    #                 games = response.json()['Item']['GIHtmls']
-    #                 game = games[0]
-    #                 if game['Href'] is None:
-    #                     print("沒有找到遊戲")
-    #                     await asyncio.sleep(0.5)
-    #                 else:
-    #                     self.parser_game_info(game['Href'])
-    #                     break
-    #             else:
-    #                 print(f"API 請求錯誤: {status_code}")
-    #                 raise Exception(f"API 請求錯誤: {status_code}")
-            
-    #         await self.page.goto(self.sell_url,wait_until='domcontentloaded')  
-            
-    #     except Exception as e:
-    #         print(f"準備購買錯誤: {str(e)}")
     async def ready_to_buy(self):
         """準備購買流程"""
         try:
-            await self.page.goto(setting.SELL_URL, wait_until='domcontentloaded')
-            interval = 0.15
-            max_attempts = int(150 / interval)
+            while True:
+                params = {
+                    "path": setting.GAMES_API,
+                    "payload": {
+                        "id": setting.GAME_ID,
+                        "hasDeadline": True,
+                        "SystemBrowseType": 0,
+                    }
+                }
+                
+                result = await self.page.evaluate(
+                    """
+                    async ({path, payload}) => {
+                        const r = await fetch(path, {
+                            method: 'POST',
+                            headers: {
+                                'content-type': 'application/json',
+                                'accept': 'application/json, text/plain, */*'
+                            },
+                            credentials: 'include',
+                            body: JSON.stringify(payload),
+                        });
+                        return { status: r.status, json: await r.text() };
+                    }
+                    """,
+                    params,
+                )
 
-            for attempt in range(max_attempts):
-                try:
-                    resp = requests.post(
-                        setting.GAMES_API,
-                        headers=setting.HEADER,
-                        json={
-                            "id": setting.GAME_ID,
-                            "hasDeadline": True,
-                            "SystemBrowseType": 0
-                        },
-                        timeout=1 
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json().get('Item', {})
-                        htmls = data.get('GIHtmls') or []
-                        for html in htmls:
-                            if setting.PREFERRED_SESSION not in  html.get('GameInfoName'):
-                                continue
-                            if html.get('Href') is None:
-                                print("沒有找到遊戲")
-                                break
-                            href = html.get('Href')
-                            self.parser_game_info(href)
-                            print("找到開賣連結")
-                            await self.page.goto(self.sell_url, wait_until='domcontentloaded')
-                            return
-                     
 
-                       
-                except Exception as e:
-                    pass
-
-                await asyncio.sleep(interval)
-
-            raise TimeoutError("超时：在规定时间内未取得开卖链接")
-
+                print(result)
+                status_code = result['status']
+                if status_code == 200:
+                    games = json.loads(result["json"])['Item']['GIHtmls']
+                    game = games[0]
+                    if game['Href'] is None:
+                        print("沒有找到遊戲")
+                        await asyncio.sleep(0.5)
+                    else:
+                        self.parser_game_info(game['Href'])
+                        break
+                else:
+                    print(f"API 請求錯誤: {status_code}")
+                    raise Exception(f"API 請求錯誤: {status_code}")
+            
+            await self.page.goto(self.sell_url,wait_until='domcontentloaded')  
+            
         except Exception as e:
-            print(f"准备购买错误: {e}")
-            raise
-        
+            print(f"準備購買錯誤: {str(e)}")
+
+    
     def parser_game_info(self,url:str):
         parsed_url = urllib.parse.urlparse(url)
         query_params = urllib.parse.parse_qs(parsed_url.query)
@@ -345,7 +303,6 @@ class TicketBot:
         # 被踢出來要再回到搶票頁面
         try:
             await self.init_browser()
-            await self.page.pause()
             await self.ready_to_buy()
                         
             while True:

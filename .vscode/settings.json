@@ -7,7 +7,9 @@
         "imread",
         "infobars",
         "jsname",
+        "kham",
         "kktix",
         "tixcraft"
-    ]
+    ],
+    "git.ignoreLimitWarning": true
 }

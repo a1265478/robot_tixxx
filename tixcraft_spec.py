@@ -8,15 +8,13 @@ import script as S
 import requests
 import ddddocr
 from PIL import Image
-from datetime import datetime
-import subprocess
+
 class TicketBot:
     def __init__(self):
         self.browser = None
         self.page = None
         self.last_dialog_message = None
         self.isVerifying = False
-        self.is_first_time = True
 
         
     async def init_browser(self):
@@ -38,7 +36,7 @@ class TicketBot:
             color_scheme='light',
             has_touch=True,
         )
-
+       
         await self.page.add_init_script(S.SCRIPT)
         self.page = await self.page.new_page()
         self.page.set_default_timeout(15000)
@@ -73,104 +71,21 @@ class TicketBot:
     async def select_area(self):
         """選擇區域"""
         try:
-            count = 0
             while True:
-                now = datetime.now()
-                minute = now.minute
-                seconds = now.second
-                if minute % 2 != 0:
-                    await asyncio.sleep(0.5)
-                    continue
-
-                # 只在 20～40 秒之間工作，其餘時間休息
-                if seconds < 20 or seconds >= 40:
-                    await asyncio.sleep(0.5)
-                    continue
-
                 # 等待區域選項出現
                 await self.page.wait_for_selector(tixcraft_setting.AREA_LOCATOR,timeout=1000)
-                for _ in range(2):
-                    await self.page.mouse.wheel(0, random.randint(100, 150))
-                    await asyncio.sleep(random.uniform(0.1, 0.2))
+                
                 # 獲取所有區域元素
                 areas = await self.page.query_selector_all(tixcraft_setting.AREA_LOCATOR)
-                # areas = areas[2:47]
-                areas = areas[2:70]
-                count += 1
-                print(f"找到 {len(areas)} 個區域")
-                # 檢查是否有任何區域可選
-                if not areas:
-                    print("沒有找到任何區域，準備重新整理...")
-                    await self.page.wait_for_timeout(random.randint(500, 900))
-                    await self.page.reload()
-                    continue
-                
-                # 獲取所有區域的文本和狀態
-                available_areas = []
-                for area in areas:
-                    # 獲取區域文本
-                    area_text = await area.text_content()
-                    # 檢查是否可選（不含"已售完"或其他不可選狀態）
-                    if any(excluded in area_text for excluded in tixcraft_setting.EXCLUDED_AREAS):
-                        continue
-                    is_sold_out = "已售完" in area_text or "已售" in area_text or "剩餘 1" in area_text
-                    if not is_sold_out:
-                        available_areas.append((area_text, area))
-                
-                if not available_areas:
-                    await self.page.wait_for_timeout(random.randint(500, 800))
-                    await self.page.reload()
-                    continue
-
-                
-                # 按照優先順序尋找可用區域
-                selected = False
-                # 優先選擇偏好區域
-                for preferred in tixcraft_setting.PREFERRED_AREAS:
-                    for area_text, area in available_areas:
-                        if preferred in area_text:
-                            try:
-                                await area.click()
-                                print(f"成功選擇偏好區域: {area_text}")
-                                selected = True
-                                return True
-                            except Exception as e:
-                                print(f"點擊偏好區域 {area_text} 時發生錯誤: {str(e)}")
-                                continue
-                
-                # 如果沒有偏好區域，選擇有位置並沒被排除的區域
-                if not selected and not tixcraft_setting.ONLY_PREFERRED_AREAS:
-                    for area_text, area in available_areas:
-                        if not any(excluded in area_text for excluded in tixcraft_setting.EXCLUDED_AREAS):
-                            try:
-                                await area.click()
-                                print(f"成功選擇區域: {area_text}")
-                                selected = True
-                                return True
-                            except Exception as e:
-                                print(f"點擊區域 {area_text} 時發生錯誤: {str(e)}")
-                                continue
-                
-                # 如果沒有找到理想的區域，重新整理
-                if not selected:
-                    print("沒有找到理想的區域，準備重新整理...")
-                    await self.page.wait_for_timeout(random.randint(500, 900))
-                    await self.page.reload()
-                
-                # 可選擇添加短暫延遲以防止過於頻繁的重新整理
-                await asyncio.sleep(random.randint(0.2, 0.5))
-                
+                area = areas[4]
+                area_text = await area.text_content()
+                await area.click()
+                print(f"成功選擇區域: {area_text}")
+                return True
         except Exception as e:
-            page_content = await self.page.content()
-            if "Your Browsing Activity" in page_content:
-                print(f"幾次後被鎖了: {count}")
-                print(f"馬的，又再鎖，等一分鐘啦")
-                count = 0
-                await self.page.wait_for_timeout(random.randint(5000, 10000))
-                await self.page.reload()
-            else:
-                await self.page.wait_for_timeout(random.randint(500, 800))
-                await self.page.reload()
+            await self.page.wait_for_timeout(random.randint(2000, 3000))
+            await self.page.reload()
+            print(f"選擇區域時發生錯誤: {str(e)}")
             return False
 
     async def wait_for_clickable(self, selector: str, timeout: int = 500) -> bool:
@@ -213,7 +128,7 @@ class TicketBot:
             
             while not await self.wait_for_clickable("button:text('立即訂購')",timeout=100):
                 print("尚未開賣...")
-                await self.page.wait_for_timeout(random.randint(100, 300))
+                await self.page.wait_for_timeout(random.randint(300, 500))
                 await self.page.reload()            
                 print("Reload")
 
@@ -223,11 +138,16 @@ class TicketBot:
     async def click_buy_now(self):
         """點擊立即購買按鈕"""
         try:
-            await self.page.get_by_role("cell", name="立即訂購").first.click(timeout=500)
-            # element = self.page.get_by_role("row", name="2025/06/29 (日) 18:00 2025").get_by_role("button")
-            # element = await self.wait_for_clickable("button:text('立即訂購')",timeout=100)
-            # await element.wait_for(state='visible', timeout=100)
-            # await element.click()
+            # await self.page.get_by_role("cell", name="立即訂購").first.click(timeout=500)
+            row = self.page.get_by_role("row", name=tixcraft_setting.DAY_WORD)
+            button = row.get_by_role("button", name="立即訂購")
+            can_click = await button.is_enabled(timeout=200) and await button.is_visible(timeout=200)
+            if can_click:
+                await button.click()
+            else:
+                print(f"尚未開賣")
+                await self.page.wait_for_timeout(random.randint(100, 500))
+                await self.page.reload()
             # if await self.wait_for_clickable("button:text('立即訂購')"):
             #     await self.page.locator('button:text("立即訂購")').click()
         except Exception as e:
@@ -317,7 +237,6 @@ class TicketBot:
         """確認購買"""
         try:
             # await self.alert_discord('請輸入驗證碼')
-            await self.force_focus()
             await self.choose_ticket_count()
             await self.page.locator('#TicketForm_agree').check(timeout=1000)
             await self.page.get_by_placeholder("請輸入驗證碼").click(timeout=500)
@@ -344,24 +263,6 @@ class TicketBot:
                     break
         except Exception as e:
             print(f"選張數確認購買錯誤: {str(e)}")
-
-    async def force_focus(self):
-        try:
-            await self.page.bring_to_front()
-            TicketBot.mac_notification(
-                "快輸入驗證碼",
-                "已進入搶票驗證碼頁面，請回來電腦操作！"
-            )
-        except:
-            print("Something wrong")
-
-    @staticmethod
-    def mac_notification(title: str, message: str):
-        subprocess.run([
-            "osascript",
-            "-e",
-            f'display notification "{message}" with title "{title}" sound name "Ping"'
-        ])
 
     async def ocr_captcha(self):
         """OCR 驗證碼"""
@@ -435,8 +336,9 @@ class TicketBot:
                         await self.page.goto(tixcraft_setting.SELL_URL, 
                                wait_until='domcontentloaded')
                     if 'game' in self.page.url:
-                        await self.page.goto(tixcraft_setting.SELL_URL, 
-                               wait_until='domcontentloaded')
+                        # await self.page.goto(tixcraft_setting.SELL_URL, 
+                        #        wait_until='domcontentloaded')
+                        await self.click_buy_now()
                     if 'verify' in self.page.url:
                         await self.enter_member_number()
                     if 'area' in self.page.url:
@@ -467,8 +369,6 @@ class TicketBot:
                 await self.page.pause()
                 self.keep_running = asyncio.Event()  # 建立事件
                 await self.keep_running.wait()
-
-
                 
       
 async def main():

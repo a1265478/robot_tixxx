@@ -46,4 +46,5 @@ BROWSER_ARGS = ['--disable-dev-shm-usage',
     '--disable-blink-features=AutomationControlled',
     f'--window-size={random.randint(1050, 1200)},{random.randint(800, 900)}',
     '--disable-gpu',
+    
 ]
