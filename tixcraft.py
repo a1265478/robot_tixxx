@@ -6,12 +6,11 @@ import time
 from random import uniform
 import script as S
 import requests
-import ddddocr
-from PIL import Image
 from datetime import datetime
-import subprocess
+
 class TicketBot:
     def __init__(self):
+        self.context = None
         self.browser = None
         self.page = None
         self.last_dialog_message = None
@@ -22,33 +21,41 @@ class TicketBot:
     async def init_browser(self):
         """Initialize browser with optimized settings"""
         playwright = await async_playwright().start()
-        user_data_dir = tixcraft_setting.USER_DATA_DIR
-        self.page = await playwright.chromium.launch_persistent_context(
-            user_data_dir,
-            headless=False,
-            channel='chrome',
-            args=S.BROWSER_ARGS,
-            viewport=tixcraft_setting.VIEWPORT,
-            user_agent=tixcraft_setting.USER_AGENT,
-            java_script_enabled=True,
-            locale='zh-TW',
-            timezone_id='Asia/Taipei',
-            geolocation={'latitude': 25.0330, 'longitude': 121.5654},
-            permissions=['geolocation'],
-            color_scheme='light',
-            has_touch=True,
-        )
-
-        await self.page.add_init_script(S.SCRIPT)
-        self.page = await self.page.new_page()
-        self.page.set_default_timeout(15000)
-        self.page.set_default_navigation_timeout(15000+ 5000)
+        browser = await playwright.chromium.connect_over_cdp(tixcraft_setting.CHROME_IP)
+        self.context = browser.contexts[0]
+        self.page = self.context.pages[0]
+       
         self.page.on("dialog", lambda dialog: self._on_dialog(dialog))
         await self.add_human_behavior()
+        # playwright = await async_playwright().start()
+        # user_data_dir = tixcraft_setting.USER_DATA_DIR
+        # self.page = await playwright.chromium.launch_persistent_context(
+        #     user_data_dir,
+        #     headless=False,
+        #     channel='chrome',
+        #     args=S.BROWSER_ARGS,
+        #     viewport=tixcraft_setting.VIEWPORT,
+        #     user_agent=tixcraft_setting.USER_AGENT,
+        #     java_script_enabled=True,
+        #     locale='zh-TW',
+        #     timezone_id='Asia/Taipei',
+        #     geolocation={'latitude': 25.0330, 'longitude': 121.5654},
+        #     permissions=['geolocation'],
+        #     color_scheme='light',
+        #     has_touch=True,
+        # )
+
+        # await self.page.add_init_script(S.SCRIPT)
+        # self.page = await self.page.new_page()
+        # self.page.set_default_timeout(15000)
+        # self.page.set_default_navigation_timeout(15000+ 5000)
+        # self.page.on("dialog", lambda dialog: self._on_dialog(dialog))
+        # await self.add_human_behavior()
 
     async def _on_dialog(self, dialog):
         # 拿到訊息並存起來
         try:
+            print(datetime.now())
             print(f"[Dialog] type={dialog.type} message={dialog.message!r}")
             
             await dialog.accept()
@@ -78,30 +85,32 @@ class TicketBot:
                 now = datetime.now()
                 minute = now.minute
                 seconds = now.second
-                if minute % 2 != 0:
-                    await asyncio.sleep(0.5)
-                    continue
-
-                # 只在 20～40 秒之間工作，其餘時間休息
-                if seconds < 20 or seconds >= 40:
-                    await asyncio.sleep(0.5)
-                    continue
+                if minute % 2 == 0:
+                    if  seconds > 5 and seconds < 52:
+                        await asyncio.sleep(0.2)
+                        continue
+                else:
+                    if  seconds > 5 and seconds < 49:
+                        await asyncio.sleep(0.2)
+                        continue
 
                 # 等待區域選項出現
-                await self.page.wait_for_selector(tixcraft_setting.AREA_LOCATOR,timeout=1000)
-                for _ in range(2):
-                    await self.page.mouse.wheel(0, random.randint(100, 150))
+                await self.page.wait_for_selector(tixcraft_setting.AREA_LOCATOR,timeout=800)
+                for i in range(2):
+                    if i % 2 == 0 : 
+                        await self.page.mouse.wheel(0, -random.randint(100, 150))
+                    else:
+                        await self.page.mouse.wheel(0, random.randint(200, 300))
                     await asyncio.sleep(random.uniform(0.1, 0.2))
                 # 獲取所有區域元素
                 areas = await self.page.query_selector_all(tixcraft_setting.AREA_LOCATOR)
-                # areas = areas[2:47]
                 count += 1
                 print(f"找到 {len(areas)} 個區域")
                 # 檢查是否有任何區域可選
                 if not areas:
                     print("沒有找到任何區域，準備重新整理...")
                     await self.page.wait_for_timeout(random.randint(500, 900))
-                    await self.page.reload()
+                    await self.page.reload(wait_until='commit')
                     continue
                 
                 # 獲取所有區域的文本和狀態
@@ -118,7 +127,7 @@ class TicketBot:
                 
                 if not available_areas:
                     await self.page.wait_for_timeout(random.randint(500, 800))
-                    await self.page.reload()
+                    await self.page.reload(wait_until='commit')
                     continue
 
                 
@@ -154,7 +163,8 @@ class TicketBot:
                 if not selected:
                     print("沒有找到理想的區域，準備重新整理...")
                     await self.page.wait_for_timeout(random.randint(500, 900))
-                    await self.page.reload()
+                    await self.page.reload(wait_until='commit')
+                    continue
                 
                 # 可選擇添加短暫延遲以防止過於頻繁的重新整理
                 await asyncio.sleep(random.randint(0.2, 0.5))
@@ -165,11 +175,11 @@ class TicketBot:
                 print(f"幾次後被鎖了: {count}")
                 print(f"馬的，又再鎖，等一分鐘啦")
                 count = 0
-                await self.page.wait_for_timeout(random.randint(5000, 10000))
-                await self.page.reload()
+                await self.page.wait_for_timeout(random.randint(5000, 8000))
+                await self.page.reload(wait_until='commit')
             else:
                 await self.page.wait_for_timeout(random.randint(500, 800))
-                await self.page.reload()
+                await self.page.reload(wait_until='commit')
             return False
 
     async def wait_for_clickable(self, selector: str, timeout: int = 500) -> bool:
@@ -180,36 +190,10 @@ class TicketBot:
             return True
         except TimeoutError:
             return False
-        
-    async def login(self):
-        """登入流程"""
-        try:
-            await self.page.goto(tixcraft_setting.LOGIN_URL, wait_until='domcontentloaded')
-            await self.page.locator("#bs-navbar").get_by_role("link", name="會員登入").click()
-            await self.page.locator("#loginGoogle").click()
-            await self.page.get_by_label("電子郵件地址或電話號碼").fill(tixcraft_setting.ACCOUNT)
-            await self.page.wait_for_timeout(500)
-            await self.page.get_by_label("電子郵件地址或電話號碼").press("Enter")
-            await self.page.get_by_label("輸入您的密碼").fill(tixcraft_setting.PASSWORD)
-            await self.page.get_by_label("輸入您的密碼").press("Enter")
-            while True:
-                print("等待登入...")
-                if await self.wait_for_clickable(".user-name"):
-                    break
-
-            await self.page.goto(tixcraft_setting.SELL_URL, 
-                               wait_until='domcontentloaded')
-            print("登入成功")
-
-        except Exception as e:
-            print(f"登入錯誤: {str(e)}")
 
     async def ready_to_buy(self):
         """準備購買流程"""
         try:
-            
-            # element = await self.page.get_by_role("row", name="2025/06/29 (日) 18:00 2025").get_by_role("button")
-            
             while not await self.wait_for_clickable("button:text('立即訂購')",timeout=100):
                 print("尚未開賣...")
                 await self.page.wait_for_timeout(random.randint(100, 300))
@@ -222,13 +206,9 @@ class TicketBot:
     async def click_buy_now(self):
         """點擊立即購買按鈕"""
         try:
-            await self.page.get_by_role("cell", name="立即訂購").first.click(timeout=500)
-            # element = self.page.get_by_role("row", name="2025/06/29 (日) 18:00 2025").get_by_role("button")
-            # element = await self.wait_for_clickable("button:text('立即訂購')",timeout=100)
-            # await element.wait_for(state='visible', timeout=100)
-            # await element.click()
-            # if await self.wait_for_clickable("button:text('立即訂購')"):
-            #     await self.page.locator('button:text("立即訂購")').click()
+            element = self.page.get_by_role("row", name=tixcraft_setting.DAY_WORD).get_by_role("button")
+            await element.wait_for(state='visible', timeout=100)
+            await element.click()
         except Exception as e:
             await self.page.wait_for_timeout(random.randint(100, 500))
             await self.page.reload()
@@ -315,14 +295,10 @@ class TicketBot:
     async def commit_to_buy(self):
         """確認購買"""
         try:
-            # await self.alert_discord('請輸入驗證碼')
             await self.force_focus()
             await self.choose_ticket_count()
             await self.page.locator('#TicketForm_agree').check(timeout=1000)
             await self.page.get_by_placeholder("請輸入驗證碼").click(timeout=500)
-            # code = None
-            # await self.page.locator(tixcraft_setting.OCR_IMAGE_LOCATOR).screenshot(path=tixcraft_setting.IMAGE_PATH)
-            # code = await self.ocr_captcha()
             try:
                 with open(tixcraft_setting.CAPTCHA, "r", encoding="utf-8") as f:
                     code = f.read().strip().lower()
@@ -330,8 +306,7 @@ class TicketBot:
                 raise RuntimeError("找不到 captcha.txt，請先建立並輸入驗證碼")
             if len(code) == 4:
                 await self.page.locator("input[placeholder='請輸入驗證碼']").fill(code,timeout=500)
-            # await self.page.wait_for_timeout(random.randint(100, 300))
-            # await self.page.locator("button:text('確認張數')").click(timeout=500)
+            await self.page.wait_for_timeout(random.randint(100, 200))
             while True:
                 if await self.wait_for_clickable("input[placeholder='請輸入驗證碼']"):
                     captcha_text = await self.page.locator("input[placeholder='請輸入驗證碼']").input_value(timeout=500)
@@ -349,33 +324,6 @@ class TicketBot:
             await self.page.bring_to_front()
         except:
             print("Something wrong")
-
-
-
-    async def ocr_captcha(self):
-        """OCR 驗證碼"""
-        try:
-            # 截圖並保存圖片
-            await self.page.locator(tixcraft_setting.OCR_IMAGE_LOCATOR).screenshot(path=tixcraft_setting.IMAGE_PATH)
-            print("Captcha image saved.")
-            
-            ocr = ddddocr.DdddOcr()
-            with open(tixcraft_setting.IMAGE_PATH, "rb") as f:
-                image = f.read()
-            result = ocr.classification(image)
-            print(result)
-            
-
-            if len(result) == 4 and result.isalnum():
-                print(f"OCR Result: {result}")
-                return result
-            else:
-                print(f"OCR Failed or Invalid Result: {result}")
-                return ""
-            
-        except Exception as e:
-            print(f"OCR Error: {str(e)}")
-            return None
 
     async def check_is_success(self):   
         try:
@@ -411,13 +359,9 @@ class TicketBot:
         # 被踢出來要再回到搶票頁面
         try:
             await self.init_browser()  
-            # await self.login()
             await self.page.goto(tixcraft_setting.SELL_URL, 
                                wait_until='domcontentloaded')
-            await self.page.pause()
-            # await self.setup_page()
             await self.navigate_to_sell_page()
-
             while True: 
                 try:
                     if 'detail' in self.page.url:
@@ -426,11 +370,13 @@ class TicketBot:
                     if 'game' in self.page.url:
                         await self.page.goto(tixcraft_setting.SELL_URL, 
                                wait_until='domcontentloaded')
+                        # await self.click_buy_now()
                     if 'verify' in self.page.url:
                         await self.enter_member_number()
                     if 'area' in self.page.url:
                         await self.select_area()
                     if 'ticket/ticket' in self.page.url:
+                        print(self.page.url)
                         await self.commit_to_buy()
                     if 'order' in self.page.url:
                         print('Searching')
